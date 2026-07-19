@@ -1,0 +1,13 @@
+# 로컬 개발용 예시 — 복사 후 application-local.yml 로 사용
+# spring:
+#   datasource:
+#     url: jdbc:h2:mem:emg;MODE=Oracle;DB_CLOSE_DELAY=-1
+#     username: sa
+#     password:
+#     driver-class-name: org.h2.Driver
+#   jpa:
+#     hibernate:
+#       ddl-auto: update
+#     properties:
+#       hibernate:
+#         default_schema: PUBLIC

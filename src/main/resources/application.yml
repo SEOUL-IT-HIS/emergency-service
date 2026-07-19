@@ -1,0 +1,57 @@
+# ============================================================
+# EMG emergency-service 공통 설정
+# 개인 PC 오버라이드: application-local.yml
+# ============================================================
+
+server:
+  port: 8085
+  servlet:
+    session:
+      cookie:
+        same-site: none
+        secure: true
+
+app:
+  api:
+    host: localhost
+    port: ${server.port}
+    base-url: http://${app.api.host}:${server.port}
+  cors:
+    allowed-origin-patterns:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
+
+spring:
+  application:
+    name: emergency-service
+  config:
+    import: optional:classpath:application-local.yml
+  datasource:
+    url: jdbc:oracle:thin:@192.168.1.128:1521:XE
+    username: hospital
+    password: "1111"
+    driver-class-name: oracle.jdbc.OracleDriver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: EMG
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+  packages-to-scan: kr.co.seoulit.his.emergencyservice
+  paths-to-match: /api/**
