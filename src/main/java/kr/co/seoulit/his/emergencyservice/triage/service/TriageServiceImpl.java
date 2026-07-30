@@ -55,7 +55,7 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional
-    public TriageAssessmentDto updateKtas(Long id, KtasUpdateRequestDto request) {
+    public TriageAssessmentDto updateKtas(String id, KtasUpdateRequestDto request) {
         TriageAssessment entity = triageAssessmentRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("ktas", id));
         if (StringUtils.hasText(request.getKtasScore())) {

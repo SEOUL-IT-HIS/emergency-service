@@ -4,6 +4,6 @@ import kr.co.seoulit.his.emergencyservice.resource.entity.BedAssignment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface BedAssignmentRepository extends JpaRepository<BedAssignment, Long> {
+public interface BedAssignmentRepository extends JpaRepository<BedAssignment, String> {
     List<BedAssignment> findByReceptionNoAndReleasedAtIsNull(String receptionNo);
 }

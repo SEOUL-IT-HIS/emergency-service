@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.care.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -8,15 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(schema = "EMG", name = "CPR_EVENT")
+@Table(schema = "EMERGENCY", name = "CPR_EVENT")
 @Getter
 @Setter
 public class CprEvent {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "CPR_EVENT_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "CPR_EVENT_ID", length = 36)
+    private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
     private String receptionNo;

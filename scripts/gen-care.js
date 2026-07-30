@@ -27,7 +27,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "CLINICAL_NOTE")
+@Table(schema = "EMERGENCY", name = "CLINICAL_NOTE")
 @Getter
 @Setter
 public class ClinicalNote {
@@ -63,7 +63,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "TREATMENT_RECORD")
+@Table(schema = "EMERGENCY", name = "TREATMENT_RECORD")
 @Getter
 @Setter
 public class TreatmentRecord {
@@ -102,7 +102,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "MEDICATION_ADMINISTRATION")
+@Table(schema = "EMERGENCY", name = "MEDICATION_ADMINISTRATION")
 @Getter
 @Setter
 public class MedicationAdministration {
@@ -149,7 +149,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(schema = "EMG", name = "CPR_EVENT")
+@Table(schema = "EMERGENCY", name = "CPR_EVENT")
 @Getter
 @Setter
 public class CprEvent {
@@ -185,7 +185,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "CPR_TIMELINE")
+@Table(schema = "EMERGENCY", name = "CPR_TIMELINE")
 @Getter
 @Setter
 public class CprTimeline {

@@ -1,20 +1,22 @@
 package kr.co.seoulit.his.emergencyservice.resource.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EQUIPMENT")
+@Table(schema = "EMERGENCY", name = "EQUIPMENT")
 @Getter
 @Setter
 public class Equipment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "EQUIPMENT_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "EQUIPMENT_ID", length = 36)
+    private String id;
 
     @Column(name = "ASSET_NO", length = 20, unique = true)
     private String assetNo;

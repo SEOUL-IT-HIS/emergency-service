@@ -1,20 +1,22 @@
 package kr.co.seoulit.his.emergencyservice.care.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "TREATMENT_RECORD")
+@Table(schema = "EMERGENCY", name = "TREATMENT_RECORD")
 @Getter
 @Setter
 public class TreatmentRecord {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "TREATMENT_RECORD_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "TREATMENT_RECORD_ID", length = 36)
+    private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
     private String receptionNo;

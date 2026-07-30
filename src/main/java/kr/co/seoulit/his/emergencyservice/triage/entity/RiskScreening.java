@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "RISK_SCREENING")
+@Table(schema = "EMERGENCY", name = "RISK_SCREENING")
 @Getter
 @Setter
 public class RiskScreening {
@@ -15,7 +15,7 @@ public class RiskScreening {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "RISK_SCREENING_ID")
-    private Long id;
+    private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
     private String receptionNo;

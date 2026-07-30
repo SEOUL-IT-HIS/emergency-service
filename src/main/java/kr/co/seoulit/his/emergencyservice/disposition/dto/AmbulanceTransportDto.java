@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class AmbulanceTransportDto {
-    private Long id;
-    private Long dispositionId;
+    private String id;
+    private String dispositionId;
     private String ambulanceNo;
     private String transportTypeCode;
     private LocalDateTime departedAt;

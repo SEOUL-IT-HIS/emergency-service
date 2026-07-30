@@ -1,6 +1,6 @@
 # ============================================================
-# EMG emergency-service 공통 설정
-# 개인 PC 오버라이드: application-local.yml
+# EMG emergency-service 공통 ?�정
+# 개인 PC ?�버?�이?? application-local.yml
 # ============================================================
 
 server:
@@ -38,7 +38,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        default_schema: EMG
+        default_schema: EMERGENCY
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

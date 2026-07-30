@@ -34,7 +34,7 @@ public class TriageController {
     @Operation(summary = "KTAS 등급 재평가", description = "UC-TRI-03 · 중증도 갱신")
     @PutMapping("/ktas/{id}")
     public ApiResponse<TriageAssessmentDto> updateKtas(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody KtasUpdateRequestDto request) {
         return ApiResponse.success(triageService.updateKtas(id, request));
     }

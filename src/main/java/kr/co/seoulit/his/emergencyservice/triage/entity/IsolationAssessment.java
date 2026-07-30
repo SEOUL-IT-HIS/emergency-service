@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ISOLATION_ASSESSMENT")
+@Table(schema = "EMERGENCY", name = "ISOLATION_ASSESSMENT")
 @Getter
 @Setter
 public class IsolationAssessment {
@@ -14,7 +14,7 @@ public class IsolationAssessment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ISOLATION_ASSESSMENT_ID")
-    private Long id;
+    private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
     private String receptionNo;

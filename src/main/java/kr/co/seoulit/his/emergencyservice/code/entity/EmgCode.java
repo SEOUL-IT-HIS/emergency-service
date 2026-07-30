@@ -1,20 +1,22 @@
 package kr.co.seoulit.his.emergencyservice.code.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EMG_CODE")
+@Table(schema = "EMERGENCY", name = "EMG_CODE")
 @Getter
 @Setter
 public class EmgCode {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "EMG_CODE_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "EMG_CODE_ID", length = 36)
+    private String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "EMG_CODE_GROUP_ID", nullable = false)

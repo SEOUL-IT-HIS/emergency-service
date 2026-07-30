@@ -99,7 +99,7 @@ infrastructure → JPA/MyBatis, Feign/WebClient (Consumer), Oracle
 ## 7. DB 설계 원칙
 
 1. Oracle만 사용
-2. PK `{table}_id`, FK는 **서비스 내부만** 물리 FK; 타 서비스는 `reception_no`, `order_id`, `*_by_id` 논리 참조
+2. PK `{table}_id` = **VARCHAR2(36) UUID** (MSA 공통). FK는 **서비스 내부만** 물리 FK; 타 서비스는 `reception_no`, `order_id`, `*_by_id` 논리 참조
 3. 공통 컬럼: `created_at`, `updated_at`
 4. 여부: `CHAR(1)` `'Y'/'N'`
 5. 코드는 값만 저장, 코드명 스냅샷 금지

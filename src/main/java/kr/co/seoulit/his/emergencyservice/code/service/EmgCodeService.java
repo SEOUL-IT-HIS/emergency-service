@@ -7,6 +7,6 @@ public interface EmgCodeService {
     List<EmgCodeGroupDto> getCodes();
     List<EmgCodeDto> getCodesByGroup(String groupCode);
     EmgCodeDto createCode(EmgCodeCreateRequestDto request);
-    EmgCodeDto updateCode(Long codeId, EmgCodeUpdateRequestDto request);
-    EmgCodeDto updateUseYn(Long codeId, EmgCodeUseYnRequestDto request);
+    EmgCodeDto updateCode(String codeId, EmgCodeUpdateRequestDto request);
+    EmgCodeDto updateUseYn(String codeId, EmgCodeUseYnRequestDto request);
 }

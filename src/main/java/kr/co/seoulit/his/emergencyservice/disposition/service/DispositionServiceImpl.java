@@ -38,7 +38,7 @@ public class DispositionServiceImpl implements DispositionService {
 
     @Override
     @Transactional
-    public AdmissionRequestDto createAdmissionRequest(Long dispositionId, AdmissionRequestCreateDto request) {
+    public AdmissionRequestDto createAdmissionRequest(String dispositionId, AdmissionRequestCreateDto request) {
         Disposition disposition = findDisposition(dispositionId);
         AdmissionRequest entity = new AdmissionRequest();
         entity.setDisposition(disposition);
@@ -61,7 +61,7 @@ public class DispositionServiceImpl implements DispositionService {
 
     @Override
     @Transactional
-    public TransferNoteDto createTransferNote(Long dispositionId, TransferNoteCreateDto request) {
+    public TransferNoteDto createTransferNote(String dispositionId, TransferNoteCreateDto request) {
         Disposition disposition = findDisposition(dispositionId);
         TransferNote entity = new TransferNote();
         entity.setDisposition(disposition);
@@ -85,7 +85,7 @@ public class DispositionServiceImpl implements DispositionService {
 
     @Override
     @Transactional
-    public AmbulanceTransportDto createAmbulanceTransport(Long dispositionId, AmbulanceTransportCreateDto request) {
+    public AmbulanceTransportDto createAmbulanceTransport(String dispositionId, AmbulanceTransportCreateDto request) {
         Disposition disposition = findDisposition(dispositionId);
         AmbulanceTransport entity = new AmbulanceTransport();
         entity.setDisposition(disposition);
@@ -109,7 +109,7 @@ public class DispositionServiceImpl implements DispositionService {
         return dto;
     }
 
-    private Disposition findDisposition(Long id) {
+    private Disposition findDisposition(String id) {
         return dispositionRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("disposition", id));
     }

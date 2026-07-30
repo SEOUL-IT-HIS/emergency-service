@@ -4,6 +4,6 @@ import kr.co.seoulit.his.emergencyservice.triage.entity.TriageAssessment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface TriageAssessmentRepository extends JpaRepository<TriageAssessment, Long> {
+public interface TriageAssessmentRepository extends JpaRepository<TriageAssessment, String> {
     List<TriageAssessment> findByReceptionNo(String receptionNo);
 }

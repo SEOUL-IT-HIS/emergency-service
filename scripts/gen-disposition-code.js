@@ -27,7 +27,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "DISPOSITION")
+@Table(schema = "EMERGENCY", name = "DISPOSITION")
 @Getter
 @Setter
 public class Disposition {
@@ -60,7 +60,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ADMISSION_REQUEST")
+@Table(schema = "EMERGENCY", name = "ADMISSION_REQUEST")
 @Getter
 @Setter
 public class AdmissionRequest {
@@ -94,7 +94,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "TRANSFER_NOTE")
+@Table(schema = "EMERGENCY", name = "TRANSFER_NOTE")
 @Getter
 @Setter
 public class TransferNote {
@@ -131,7 +131,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "AMBULANCE_TRANSPORT")
+@Table(schema = "EMERGENCY", name = "AMBULANCE_TRANSPORT")
 @Getter
 @Setter
 public class AmbulanceTransport {
@@ -519,7 +519,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EMG_CODE_GROUP")
+@Table(schema = "EMERGENCY", name = "EMG_CODE_GROUP")
 @Getter
 @Setter
 public class EmgCodeGroup {
@@ -555,7 +555,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EMG_CODE")
+@Table(schema = "EMERGENCY", name = "EMG_CODE")
 @Getter
 @Setter
 public class EmgCode {

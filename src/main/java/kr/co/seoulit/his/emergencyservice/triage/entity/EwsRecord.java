@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EWS_RECORD")
+@Table(schema = "EMERGENCY", name = "EWS_RECORD")
 @Getter
 @Setter
 public class EwsRecord {
@@ -15,7 +15,7 @@ public class EwsRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "EWS_RECORD_ID")
-    private Long id;
+    private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
     private String receptionNo;
