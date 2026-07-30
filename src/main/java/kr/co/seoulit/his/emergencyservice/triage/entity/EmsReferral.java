@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.triage.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -12,8 +13,9 @@ import java.time.LocalDateTime;
 public class EmsReferral {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "EMS_REFERRAL_ID")
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "EMS_REFERRAL_ID", length = 36)
     private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)

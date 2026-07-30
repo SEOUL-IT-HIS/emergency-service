@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface TriageAssessmentRepository extends JpaRepository<TriageAssessment, String> {
     List<TriageAssessment> findByReceptionNo(String receptionNo);
+    List<TriageAssessment> findByReceptionNoOrderByAssessedAtAsc(String receptionNo);
+    boolean existsByReceptionNoAndAssessmentTypeCode(String receptionNo, String assessmentTypeCode);
 }

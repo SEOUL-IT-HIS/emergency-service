@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.triage.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
@@ -13,8 +14,9 @@ import java.time.LocalDateTime;
 public class EwsRecord {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "EWS_RECORD_ID")
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "EWS_RECORD_ID", length = 36)
     private String id;
 
     @Column(name = "RECEPTION_NO", length = 20)
