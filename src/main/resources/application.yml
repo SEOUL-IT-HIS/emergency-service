@@ -23,10 +23,6 @@ app:
   admin:
     # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
     base-url: http://192.168.1.128:8080
-  commoncode:
-    # 서버 기동 시 admin-service 에서 미리 받아 로컬 캐시에 적재할 공통코드 그룹
-    cache-groups:
-      - KTAS_LEVEL
 
 spring:
   application:
