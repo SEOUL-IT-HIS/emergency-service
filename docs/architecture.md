@@ -62,13 +62,13 @@
 │ (RCP)    │ 목록제공 │  (EMG)     │ 조회    │ (PAT)    │
 └──────────┘         └─────┬──────┘         └──────────┘
                            │
-              consultations / admission-request
+   consultations(동기) / admission-request(비동기, Kafka)
                            │
                     OPD / IPT / ADM
 ```
 
-- 동기: REST
-- 비동기(후보): `order.created|confirmed|updated|cancelled|routed|validation.completed` 구독
+- 동기: REST — 협진(`/consultations`), 병상 가용 조회(`GET`, IPT — 쓰기 없음)
+- 비동기(Kafka): `order.created|confirmed|updated|cancelled|routed|validation.completed` 구독 + 입원요청 코레오그래피 `ADMISSION_REQUESTED → REGISTRATION_COMPLETED → BED_ASSIGNED`(오케스트레이터 없음, 상세: `flow.md` 7-1장)
 - BFF: 경로가 `/api/emergency/*` 이어도 **데이터 Provider는 실제 소유자**로 문서화
 
 ## 5. 백엔드 계층 (권장)
@@ -141,3 +141,5 @@ infrastructure → JPA/MyBatis, Feign/WebClient (Consumer), Oracle
 ## 10. 배포·인프라 (전사)
 
 Docker 이미지 → Jenkins CI → Nginx(사내망). 서비스별 독립 배포.
+
+메시지 브로커: **Kafka** 도입 — 서비스 간 비동기 이벤트(예: 입원요청 코레오그래피, GR2 `order.*` 이벤트 구독)에 사용. 중앙 오케스트레이터 서비스는 두지 않고, 각 서비스가 합의된 토픽만 구독/발행(코레오그래피). 우선순위상 환자등록·접수·진료 연결(REST) 골격을 먼저 구축한 뒤 착수.

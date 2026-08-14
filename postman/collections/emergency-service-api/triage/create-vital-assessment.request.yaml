@@ -1,0 +1,25 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/emergency/triage/vital-assessments'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "encounterId": "ER-20260716-001",
+      "measuredById": "E0003",
+      "vitals": [
+        {
+          "systolicBp": 120,
+          "heartRate": 88,
+          "respRate": 18,
+          "temperature": 36.8,
+          "spo2": 98,
+          "gcs": 15,
+          "ewsScore": 1.5
+        }
+      ]
+    }
