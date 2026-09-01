@@ -58,6 +58,8 @@ public class CareServiceImpl implements CareService {
         return latestByReception.values().stream().map(assessment -> {
             EmergencyPatientDto dto = new EmergencyPatientDto();
             dto.setReceptionNo(assessment.getReceptionNo());
+            // TODO PAT 연동 전 임시값. PAT batch-query로 실제 환자명 채울 것.
+            dto.setPatientName(mockPatientName(assessment.getReceptionNo()));
             dto.setKtasLevelCode(assessment.getKtasLevelCode());
             dto.setLastAssessedAt(assessment.getAssessedAt());
             dto.setCareStatusCode("IN_CARE");
@@ -70,6 +72,16 @@ public class CareServiceImpl implements CareService {
             return dto;
         }).filter(dto -> !StringUtils.hasText(status) || status.equals(dto.getCareStatusCode()))
                 .collect(Collectors.toList());
+    }
+
+    private static final Map<String, String> MOCK_PATIENT_NAMES = Map.of(
+            "ER-20260716-001", "홍길동",
+            "ER-20260716-002", "김영희",
+            "ER-20260716-003", "이철수"
+    );
+
+    private String mockPatientName(String receptionNo) {
+        return MOCK_PATIENT_NAMES.getOrDefault(receptionNo, "환자(" + receptionNo + ")");
     }
 
     @Override

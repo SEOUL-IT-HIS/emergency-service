@@ -30,9 +30,9 @@ spring:
   config:
     import: optional:classpath:application-local.yml
   datasource:
-    url: jdbc:oracle:thin:@192.168.1.128:1521:XE
-    username: hospital
-    password: "1111"
+    url: jdbc:oracle:thin:@//seoulit.pe.kr:1521/FREEPDB1
+    username: emergency
+    password: "emergency"
     driver-class-name: oracle.jdbc.OracleDriver
   jpa:
     hibernate:

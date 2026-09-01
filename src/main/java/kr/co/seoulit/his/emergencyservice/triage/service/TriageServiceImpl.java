@@ -27,10 +27,12 @@ public class TriageServiceImpl implements TriageService {
     private static final Set<String> VALID_SCREEN_RESULTS = Set.of("NEGATIVE", "POSITIVE", "INCONCLUSIVE");
 
     private final EmsReferralRepository emsReferralRepository;
+
     private final TriageAssessmentRepository triageAssessmentRepository;
     private final EwsRecordRepository ewsRecordRepository;
     private final IsolationAssessmentRepository isolationAssessmentRepository;
     private final RiskScreeningRepository riskScreeningRepository;
+
     private final TriageMapstructMapper triageMapper;
 
     @Override
@@ -66,7 +68,8 @@ public class TriageServiceImpl implements TriageService {
         if ("INITIAL".equals(assessmentTypeCode)
                 && triageAssessmentRepository.existsByReceptionNoAndAssessmentTypeCode(
                         request.getEncounterId(), "INITIAL")) {
-            throw new ConflictException("이미 최초 분류(INITIAL)가 등록된 접수 건입니다: " + request.getEncounterId());
+            // 이미 최초 분류(INITIAL)가 등록된 접수 건입니다
+            throw new ConflictException("Initial KTAS classification already registered for this encounter: " + request.getEncounterId());
         }
 
         TriageAssessment entity = new TriageAssessment();
@@ -203,8 +206,9 @@ public class TriageServiceImpl implements TriageService {
                 .anyMatch(existing -> existing.getReleasedAt() == null
                         && existing.getIsolationTypeCode().equals(request.getIsolationTypeCode()));
         if (hasActiveIsolation) {
+            // 이미 활성 상태인 격리가 있습니다
             throw new ConflictException(
-                    "이미 활성 상태인 격리(" + request.getIsolationTypeCode() + ")가 있습니다: " + receptionNo);
+                    "An active isolation (" + request.getIsolationTypeCode() + ") already exists: " + receptionNo);
         }
 
         IsolationAssessment entity = new IsolationAssessment();
@@ -224,7 +228,8 @@ public class TriageServiceImpl implements TriageService {
         IsolationAssessment entity = isolationAssessmentRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("isolation", id));
         if (entity.getReleasedAt() != null) {
-            throw new ConflictException("이미 해제된 격리입니다: " + id);
+            // 이미 해제된 격리입니다
+            throw new ConflictException("This isolation has already been released: " + id);
         }
         entity.setReleasedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());

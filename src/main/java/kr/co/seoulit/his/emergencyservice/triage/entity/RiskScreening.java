@@ -19,7 +19,7 @@ public class RiskScreening {
     @Column(name = "RISK_SCREENING_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "SCREENING_TYPE_CODE", length = 20)

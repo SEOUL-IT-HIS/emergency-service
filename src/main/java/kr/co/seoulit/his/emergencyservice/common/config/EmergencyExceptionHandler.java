@@ -34,7 +34,8 @@ public class EmergencyExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleUnreadableBody(HttpMessageNotReadableException exception) {
-        return ApiResponse.error("EMG_BAD_REQUEST", "요청 본문(JSON)을 해석할 수 없습니다.");
+        // 요청 본문(JSON)을 해석할 수 없습니다.
+        return ApiResponse.error("EMG_BAD_REQUEST", "Unable to parse the request body (JSON).");
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -54,6 +55,7 @@ public class EmergencyExceptionHandler {
     public ApiResponse<Void> handleUnexpected(Exception exception) {
         // 내부 예외 메시지는 스키마·SQL 등 민감정보가 섞일 수 있어 클라이언트에 노출하지 않는다
         log.error("Unhandled exception", exception);
-        return ApiResponse.error("EMG_INTERNAL_ERROR", "서버 내부 오류가 발생했습니다.");
+        // 서버 내부 오류가 발생했습니다.
+        return ApiResponse.error("EMG_INTERNAL_ERROR", "An internal server error occurred.");
     }
 }

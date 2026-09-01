@@ -137,7 +137,8 @@ Unique: `(group, code_value)`
 | PK | `{table}_id` **VARCHAR2(36) UUID** (MSA 공통 통일) |
 | 내부 FK | `{참조테이블}_id` VARCHAR2(36) — 동일 스키마 내 PK 참조 |
 | 타 서비스 논리 참조 | 상대 SoT 타입 따름 (`reception_no`, GR2 `order_id` 등) |
-| 업무번호 | `*_no` VARCHAR2(20) |
+| 업무번호(순수) | `*_no` VARCHAR2(20) — 타 서비스 PK 참조가 아닌 경우만 |
+| `reception_no` | **VARCHAR2(36)** — RCP `RECEPTION_ID`(PK)를 참조하는 논리 FK. PK/FK VARCHAR2(36) 통일 합의에 따름(2026-08-26). 위 "업무번호" 규칙 예외 |
 | 코드 | `*_code` / `*_cd` |
 | 여부 | `*_yn` CHAR(1) |
 | 일시 | `*_at` TIMESTAMP |

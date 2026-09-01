@@ -18,7 +18,7 @@ public class LosAlert {
     @Column(name = "LOS_ALERT_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "THRESHOLD_MINUTES")

@@ -18,7 +18,7 @@ public class MedicationAdministration {
     @Column(name = "MEDICATION_ADMINISTRATION_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "ORDER_ID", nullable = false)

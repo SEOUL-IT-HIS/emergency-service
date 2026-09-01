@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EmergencyPatientDto {
     private String receptionNo;
+    private String patientName;
     private String ktasLevelCode;
     private String careStatusCode;
     private String bedNo;
