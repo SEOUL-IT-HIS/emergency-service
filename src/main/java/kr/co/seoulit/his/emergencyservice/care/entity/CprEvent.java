@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(schema = "EMG", name = "CPR_EVENT")
+@Table(schema = "EMERGENCY", name = "CPR_EVENT")
 @Getter
 @Setter
 public class CprEvent {

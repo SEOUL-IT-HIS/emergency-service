@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "CONSULT_REQUEST")
+@Table(schema = "EMERGENCY", name = "CONSULT_REQUEST")
 @Getter
 @Setter
 public class ConsultRequest {

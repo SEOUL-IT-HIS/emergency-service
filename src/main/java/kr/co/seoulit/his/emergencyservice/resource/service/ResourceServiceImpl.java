@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +35,24 @@ public class ResourceServiceImpl implements ResourceService {
         dto.setEmptyBeds(empty);
         dto.setOccupancyRate(total == 0 ? 0 : (occupied * 100.0) / total);
         return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BedDto> getBeds(String zoneCode, String status) {
+        return bedRepository.findAll().stream()
+                .filter(bed -> !StringUtils.hasText(zoneCode) || zoneCode.equals(bed.getZoneCode()))
+                .filter(bed -> !StringUtils.hasText(status) || status.equals(bed.getBedStatusCode()))
+                .map(bed -> {
+                    BedDto dto = new BedDto();
+                    dto.setId(bed.getId());
+                    dto.setBedNo(bed.getBedNo());
+                    dto.setZoneCode(bed.getZoneCode());
+                    dto.setBedTypeCode(bed.getBedTypeCode());
+                    dto.setBedStatusCode(bed.getBedStatusCode());
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
     @Override

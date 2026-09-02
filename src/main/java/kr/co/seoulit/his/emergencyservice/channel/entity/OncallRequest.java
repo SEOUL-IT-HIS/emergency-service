@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ONCALL_REQUEST")
+@Table(schema = "EMERGENCY", name = "ONCALL_REQUEST")
 @Getter
 @Setter
 public class OncallRequest {

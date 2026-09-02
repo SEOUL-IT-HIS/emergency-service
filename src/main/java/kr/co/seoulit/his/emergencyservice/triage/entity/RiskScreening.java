@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "RISK_SCREENING")
+@Table(schema = "EMERGENCY", name = "RISK_SCREENING")
 @Getter
 @Setter
 public class RiskScreening {
