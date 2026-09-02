@@ -25,18 +25,30 @@ public class TriageController {
         return ApiResponse.success(triageService.getEmsInfo(receptionNo));
     }
 
+    @Operation(summary = "KTAS 등급 이력 조회", description = "UC-TRI-02/03 · 접수건별 KTAS 분류·재평가 이력 (INITIAL+REASSESS)")
+    @GetMapping("/ktas")
+    public ApiResponse<List<TriageAssessmentDto>> getKtasHistory(@RequestParam String receptionNo) {
+        return ApiResponse.success(triageService.getKtasHistory(receptionNo));
+    }
+
     @Operation(summary = "KTAS 등급 분류", description = "UC-TRI-02 · 최초 중증도 분류")
     @PostMapping("/ktas")
     public ApiResponse<TriageAssessmentDto> createKtas(@RequestBody KtasCreateRequestDto request) {
         return ApiResponse.success(triageService.createKtas(request));
     }
 
-    @Operation(summary = "KTAS 등급 재평가", description = "UC-TRI-03 · 중증도 갱신")
+    @Operation(summary = "KTAS 등급 재평가", description = "UC-TRI-03 · 중증도 갱신(이력 추가)")
     @PutMapping("/ktas/{id}")
     public ApiResponse<TriageAssessmentDto> updateKtas(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody KtasUpdateRequestDto request) {
         return ApiResponse.success(triageService.updateKtas(id, request));
+    }
+
+    @Operation(summary = "활력징후 이력 조회", description = "UC-TRI-04 · 접수건별 활력징후·EWS 이력")
+    @GetMapping("/vital-assessments")
+    public ApiResponse<List<EwsRecordDto>> getVitalAssessments(@RequestParam String receptionNo) {
+        return ApiResponse.success(triageService.getVitalAssessments(receptionNo));
     }
 
     @Operation(summary = "활력징후 평가 등록", description = "UC-TRI-04 · 시계열 활력징후 기록")
@@ -46,6 +58,12 @@ public class TriageController {
         return ApiResponse.success(triageService.createVitalAssessments(request));
     }
 
+    @Operation(summary = "격리 이력 조회", description = "UC-TRI-05 · 접수건별 격리 등록/해제 이력")
+    @GetMapping("/infection-isolations")
+    public ApiResponse<List<IsolationAssessmentDto>> getIsolations(@RequestParam String receptionNo) {
+        return ApiResponse.success(triageService.getIsolations(receptionNo));
+    }
+
     @Operation(summary = "감염/격리 관리", description = "UC-TRI-05 · 격리 등록 (DUR 이력은 GR2/PHM 조회)")
     @PostMapping("/infection-isolations")
     public ApiResponse<IsolationAssessmentDto> createIsolation(
@@ -53,7 +71,19 @@ public class TriageController {
         return ApiResponse.success(triageService.createIsolation(request));
     }
 
-    @Operation(summary = "위험 스크리닝", description = "UC-TRI-06 · 낙상·자살위험 등 스크리닝")
+    @Operation(summary = "격리 해제", description = "UC-TRI-05 · 격리 해제(released_at 기록, 물리삭제 아님)")
+    @PatchMapping("/infection-isolations/{id}/release")
+    public ApiResponse<IsolationAssessmentDto> releaseIsolation(@PathVariable String id) {
+        return ApiResponse.success(triageService.releaseIsolation(id));
+    }
+
+    @Operation(summary = "위험 스크리닝 이력 조회", description = "UC-TRI-06 · 접수건별 패혈증/뇌졸중 스크리닝 이력")
+    @GetMapping("/risk-screenings")
+    public ApiResponse<List<RiskScreeningDto>> getRiskScreenings(@RequestParam String receptionNo) {
+        return ApiResponse.success(triageService.getRiskScreenings(receptionNo));
+    }
+
+    @Operation(summary = "위험 스크리닝", description = "UC-TRI-06 · 패혈증·뇌졸중 위험도 스크리닝")
     @PostMapping("/risk-screenings")
     public ApiResponse<RiskScreeningDto> createRiskScreening(
             @RequestBody RiskScreeningCreateRequestDto request) {

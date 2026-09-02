@@ -201,7 +201,7 @@ Content-Type: application/json
   "code": 200,
   "message": "SUCCESS",
   "data": {
-    "triageAssessmentId": 1001,
+    "triageAssessmentId": "550e8400-e29b-41d4-a716-446655440000",
     "ktasLevelCode": "2",
     "assessedAt": "2026-07-16T10:30:00"
   }

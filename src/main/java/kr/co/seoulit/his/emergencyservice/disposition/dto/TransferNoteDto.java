@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class TransferNoteDto {
-    private Long id;
-    private Long dispositionId;
+    private String id;
+    private String dispositionId;
     private String targetHospitalCode;
     private String content;
     private String writtenById;

@@ -1,4 +1,6 @@
 HELP.md
+CLAUDE.md
+application-local.yml
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar

@@ -7,6 +7,6 @@ import lombok.Setter;
 @Setter
 public class EquipmentAssignmentCreateRequestDto {
     private String encounterId;
-    private Long equipmentId;
+    private String equipmentId;
     private String allocatedById;
 }

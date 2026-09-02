@@ -156,7 +156,6 @@ sequenceDiagram
   actor MD as 응급의
   participant FE as Emergency FE
   participant EMG as emergency-service
-  participant IPT as ward / inpatient
 
   MD->>FE: 퇴실 유형=ADMIT
   FE->>EMG: POST /dispositions
@@ -164,10 +163,40 @@ sequenceDiagram
 
   FE->>EMG: POST /dispositions/{id}/admission-request
   EMG-->>FE: ADMISSION_REQUEST 저장
-  Note over EMG,IPT: IPT/RCP에 수신 POST API 부재<br/>(카탈로그 이슈#6) — 동기 or 이벤트 확정 필요
+  Note over EMG: 저장 후 Kafka 이벤트 발행 (7-1장)<br/>IPT/RCP 동기 수신 API는 만들지 않음 (카탈로그 이슈#6 해결)
 ```
 
 전원 시에는 `transfer-note` 작성 전 GR2 `GET /api/orders`로 투약내역을 조회해 소견서에 반영합니다(스냅샷이 아닌 조회 시점 데이터).
+
+---
+
+## 7-1. 입원요청 이벤트 코레오그래피 (Kafka)
+
+> **결정**: 카탈로그 이슈#6은 **이벤트 기반 코레오그래피**로 확정. 별도 오케스트레이터 서비스는 두지 않음 — 각 서비스가 정해진 토픽만 구독/발행.
+> **우선순위**: 환자등록 → 접수 → 외래/응급 진료 연결(REST) 골격을 먼저 구축한 뒤 착수. 지금은 **설계만 확정, 구현은 보류**.
+
+```mermaid
+sequenceDiagram
+  participant EMG as emergency-service
+  participant Kafka as Kafka
+  participant RCP as reception-service
+  participant IPT as ward / inpatient-service
+
+  EMG->>Kafka: publish ADMISSION_REQUESTED<br/>{encounterId, patientId, dispositionId, diagnosis, wardPref, isolationYn, orderedBy}
+  Kafka-->>RCP: consume ADMISSION_REQUESTED
+  RCP->>RCP: 입원 수속 (보험자격·서약서)
+  RCP->>Kafka: publish REGISTRATION_COMPLETED<br/>{dispositionId, patientId, approved}
+  Kafka-->>IPT: consume REGISTRATION_COMPLETED
+  IPT->>IPT: 병상 예약(RESERVED) → 배정 확정(OCCUPIED)
+  IPT->>Kafka: publish BED_ASSIGNED | ADMISSION_REJECTED
+  Kafka-->>EMG: consume BED_ASSIGNED | ADMISSION_REJECTED
+  EMG->>EMG: dispositionStatus 완료 처리<br/>(응급실 자체 BED* 반납)
+```
+
+- 병상 **가용 여부 조회**(`GET`, IPT)는 이 이벤트 흐름과 별개로 계속 **동기 REST 유지** — 쓰기 없음, 참고용 사전 체크(수속 헛수고 방지 목적).
+- 응급이 병동 자원에 직접 쓰기(배정)하는 경로는 없음 — 병상 예약·배정 쓰기는 IPT 소유.
+- 응급은 원무/병동의 API 주소를 몰라도 됨 — 토픽 이름과 메시지 스펙만 계약(contract)으로 관리.
+- 응급에게 최종 결과(`BED_ASSIGNED`/`ADMISSION_REJECTED`) 통지는 필수 — fire-and-forget 금지(퇴실 완료 처리·응급실 병상 반납 타이밍에 필요).
 
 ---
 

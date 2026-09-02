@@ -27,7 +27,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "CONSULT_REQUEST")
+@Table(schema = "EMERGENCY", name = "CONSULT_REQUEST")
 @Getter
 @Setter
 public class ConsultRequest {
@@ -69,7 +69,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ONCALL_REQUEST")
+@Table(schema = "EMERGENCY", name = "ONCALL_REQUEST")
 @Getter
 @Setter
 public class OncallRequest {
@@ -108,7 +108,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "SURGERY_REQUEST")
+@Table(schema = "EMERGENCY", name = "SURGERY_REQUEST")
 @Getter
 @Setter
 public class SurgeryRequest {
@@ -334,7 +334,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "LOS_ALERT")
+@Table(schema = "EMERGENCY", name = "LOS_ALERT")
 @Getter
 @Setter
 public class LosAlert {
@@ -485,7 +485,7 @@ public class MonitorServiceImpl implements MonitorService {
     @Override
     @Transactional(readOnly = true)
     public List<ExternalHospitalDto> getExternalHospitals() {
-        // NEDIS 연동 전 stub — 외부 규격 확정 후 교체
+        // NEDIS ?�동 ??stub ???��? 규격 ?�정 ??교체
         List<ExternalHospitalDto> list = new ArrayList<>();
         ExternalHospitalDto sample = new ExternalHospitalDto();
         sample.setHospitalCode("11100000");

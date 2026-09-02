@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/emergency/triage/infection-isolations'
+order: 7000
+queryParams:
+  - key: receptionNo
+    value: 'RCP-20260716-001'

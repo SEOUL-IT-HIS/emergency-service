@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class LosAlertDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private Integer thresholdMinutes;
     private LocalDateTime triggeredAt;

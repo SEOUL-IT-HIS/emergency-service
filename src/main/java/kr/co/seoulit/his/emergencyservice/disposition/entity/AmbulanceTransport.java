@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.disposition.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -12,9 +13,10 @@ import java.time.LocalDateTime;
 public class AmbulanceTransport {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "AMBULANCE_TRANSPORT_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "AMBULANCE_TRANSPORT_ID", length = 36)
+    private String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "DISPOSITION_ID", nullable = false)

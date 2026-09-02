@@ -33,7 +33,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EMS_REFERRAL")
+@Table(schema = "EMERGENCY", name = "EMS_REFERRAL")
 @Getter
 @Setter
 public class EmsReferral {
@@ -69,7 +69,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "TRIAGE_ASSESSMENT")
+@Table(schema = "EMERGENCY", name = "TRIAGE_ASSESSMENT")
 @Getter
 @Setter
 public class TriageAssessment {
@@ -109,7 +109,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EWS_RECORD")
+@Table(schema = "EMERGENCY", name = "EWS_RECORD")
 @Getter
 @Setter
 public class EwsRecord {
@@ -160,7 +160,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ISOLATION_ASSESSMENT")
+@Table(schema = "EMERGENCY", name = "ISOLATION_ASSESSMENT")
 @Getter
 @Setter
 public class IsolationAssessment {
@@ -200,7 +200,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "RISK_SCREENING")
+@Table(schema = "EMERGENCY", name = "RISK_SCREENING")
 @Getter
 @Setter
 public class RiskScreening {

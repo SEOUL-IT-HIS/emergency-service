@@ -8,7 +8,7 @@ import java.util.List;
 @Getter
 @Setter
 public class CprEventDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
@@ -18,7 +18,7 @@ public class CprEventDto {
     @Getter
     @Setter
     public static class CprTimelineItemDto {
-        private Long id;
+        private String id;
         private LocalDateTime eventAt;
         private String eventTypeCode;
         private String detail;

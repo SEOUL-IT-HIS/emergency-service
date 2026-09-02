@@ -27,7 +27,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "BED")
+@Table(schema = "EMERGENCY", name = "BED")
 @Getter
 @Setter
 public class Bed {
@@ -60,7 +60,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "BED_ASSIGNMENT")
+@Table(schema = "EMERGENCY", name = "BED_ASSIGNMENT")
 @Getter
 @Setter
 public class BedAssignment {
@@ -97,7 +97,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EQUIPMENT")
+@Table(schema = "EMERGENCY", name = "EQUIPMENT")
 @Getter
 @Setter
 public class Equipment {
@@ -127,7 +127,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EQUIPMENT_ALLOCATION")
+@Table(schema = "EMERGENCY", name = "EQUIPMENT_ALLOCATION")
 @Getter
 @Setter
 public class EquipmentAllocation {

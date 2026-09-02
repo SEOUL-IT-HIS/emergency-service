@@ -20,6 +20,9 @@ app:
     allowed-origin-patterns:
       - http://localhost:3000
       - http://127.0.0.1:3000
+  admin:
+    # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
+    base-url: http://192.168.1.128:8080
 
 spring:
   application:

@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.care.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -12,11 +13,12 @@ import java.time.LocalDateTime;
 public class ClinicalNote {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "CLINICAL_NOTE_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "CLINICAL_NOTE_ID", length = 36)
+    private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "RECORDED_BY_ID", length = 36)

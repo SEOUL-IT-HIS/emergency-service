@@ -1,0 +1,18 @@
+$kind: http-request
+method: PUT
+url: '{{baseUrl}}/api/emergency/triage/ktas/{id}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+pathVariables:
+  - key: id
+    value: '550e8400-e29b-41d4-a716-446655440000'
+body:
+  type: json
+  content: |-
+    {
+      "ktasScore": "3",
+      "assessedById": "E0002",
+      "reason": "통증 감소 후 재평가"
+    }

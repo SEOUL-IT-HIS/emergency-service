@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class EwsRecordDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private Integer systolicBp;
     private Integer heartRate;

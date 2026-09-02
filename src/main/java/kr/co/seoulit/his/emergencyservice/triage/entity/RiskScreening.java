@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.triage.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
@@ -13,11 +14,12 @@ import java.time.LocalDateTime;
 public class RiskScreening {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "RISK_SCREENING_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "RISK_SCREENING_ID", length = 36)
+    private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "SCREENING_TYPE_CODE", length = 20)
