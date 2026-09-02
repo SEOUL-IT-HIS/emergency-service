@@ -6,7 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class BedDto {
-    private Long id;
+    private String id;
     private String bedNo;
     private String zoneCode;
     private String bedTypeCode;
