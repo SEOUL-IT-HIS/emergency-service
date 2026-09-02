@@ -4,6 +4,6 @@ import kr.co.seoulit.his.emergencyservice.care.entity.ClinicalNote;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface ClinicalNoteRepository extends JpaRepository<ClinicalNote, Long> {
+public interface ClinicalNoteRepository extends JpaRepository<ClinicalNote, String> {
     List<ClinicalNote> findByReceptionNo(String receptionNo);
 }

@@ -25,7 +25,7 @@ public class DispositionController {
     @Operation(summary = "응급 입원 요청", description = "UC-DISP-02 · 병동 입원 요청 (연계:IPT)")
     @PostMapping("/{id}/admission-request")
     public ApiResponse<AdmissionRequestDto> createAdmissionRequest(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody AdmissionRequestCreateDto request) {
         return ApiResponse.success(dispositionService.createAdmissionRequest(id, request));
     }
@@ -33,7 +33,7 @@ public class DispositionController {
     @Operation(summary = "전원 소견서 작성", description = "UC-DISP-03 · 소견서(투약이력은 GET /api/orders 조회, 연계:GR2)")
     @PostMapping("/{id}/transfer-note")
     public ApiResponse<TransferNoteDto> createTransferNote(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody TransferNoteCreateDto request) {
         return ApiResponse.success(dispositionService.createTransferNote(id, request));
     }
@@ -41,7 +41,7 @@ public class DispositionController {
     @Operation(summary = "구급차 이송 기록", description = "UC-DISP-04 · 이송 메타정보 (연계:EMS)")
     @PostMapping("/{id}/ambulance-transport")
     public ApiResponse<AmbulanceTransportDto> createAmbulanceTransport(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody AmbulanceTransportCreateDto request) {
         return ApiResponse.success(dispositionService.createAmbulanceTransport(id, request));
     }

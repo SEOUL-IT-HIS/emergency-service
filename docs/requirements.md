@@ -73,7 +73,7 @@
 | No | 유스케이스 | 분류 | Provider | 연계 |
 | --- | --- | --- | --- | --- |
 | 32 | 응급 퇴실 결정 | 단독형 | EMG | - |
-| 33 | 응급 입원 요청 | Provider | EMG | IPT — **수신 API 부재** |
+| 33 | 응급 입원 요청 | Provider(이벤트) | EMG | IPT/RCP — **Kafka 이벤트 코레오그래피 확정**(`flow.md` 7-1장), 구현은 후순위 |
 | 34 | 전원 소견서 작성 | Consumer | EMG(+투약조회) | GR2 |
 | 35 | 구급차 이송 기록 | 단독형 | EMG | EMS 메타 기록 |
 
@@ -113,6 +113,7 @@
 - 현황판·LOS 알림
 - 퇴실 유형(귀가/입원/전원/사망/DAMA) 결정
 - 입원요청·전원소견서·이송기록
+- 입원요청은 Kafka 이벤트 코레오그래피로 RCP/IPT에 전달(`ADMISSION_REQUESTED → REGISTRATION_COMPLETED → BED_ASSIGNED`), 오케스트레이터 없음. 병상 가용 조회(GET)는 IPT에 동기로 유지. 상세: `flow.md` 7-1장
 
 ### FR-CODE
 - EMG 전용 코드그룹/코드값 CRUD (삭제는 `use_yn`)
@@ -134,7 +135,7 @@
 
 | # | 유스케이스 | 막힌 점 | 조치 |
 | --- | --- | --- | --- |
-| 1 | 응급 입원 요청 | IPT/RCP에 수신 POST API 없음 | 동기 API vs 이벤트 확정 |
+| 1 | 응급 입원 요청 | IPT/RCP에 수신 POST API 없음 | **해결**: Kafka 이벤트 코레오그래피 채택(`flow.md` 7-1장). 구현은 환자등록→접수→진료 연동 이후 후순위 |
 | 2 | 당직의 호출 | ADM 알림 역할 불명확 | 발송 주체·채널 확정 |
 | 3 | 협진 요청 | OPD `/referrals`와 중복 | 통합 vs 개별 유지 |
 | 4 | 수술 긴급 요청 | Q-SURGERY 미확정 | GR2 경로 확정 후 착수 |

@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/emergency/triage/ems-info'
+order: 1000
+queryParams:
+  - key: receptionNo
+    value: ''

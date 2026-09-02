@@ -39,7 +39,7 @@ public class EmgCodeController {
     @Operation(summary = "응급업무코드 수정", description = "UC-CODE-04 · 코드명·설명·정렬순서 수정(코드값 변경 불가)")
     @PutMapping("/{codeId}")
     public ApiResponse<EmgCodeDto> updateCode(
-            @PathVariable Long codeId,
+            @PathVariable String codeId,
             @RequestBody EmgCodeUpdateRequestDto request) {
         return ApiResponse.success(emgCodeService.updateCode(codeId, request));
     }
@@ -47,7 +47,7 @@ public class EmgCodeController {
     @Operation(summary = "응급업무코드 사용여부 변경", description = "UC-CODE-05 · 사용중지/사용 (삭제 대체)")
     @PutMapping("/{codeId}/use-yn")
     public ApiResponse<EmgCodeDto> updateUseYn(
-            @PathVariable Long codeId,
+            @PathVariable String codeId,
             @RequestBody EmgCodeUseYnRequestDto request) {
         return ApiResponse.success(emgCodeService.updateUseYn(codeId, request));
     }

@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class AdmissionRequestDto {
-    private Long id;
-    private Long dispositionId;
+    private String id;
+    private String dispositionId;
     private String targetDeptCode;
     private String requestStatusCode;
     private LocalDateTime requestedAt;

@@ -4,7 +4,7 @@ import kr.co.seoulit.his.emergencyservice.disposition.dto.*;
 
 public interface DispositionService {
     DispositionDto createDisposition(DispositionCreateRequestDto request);
-    AdmissionRequestDto createAdmissionRequest(Long dispositionId, AdmissionRequestCreateDto request);
-    TransferNoteDto createTransferNote(Long dispositionId, TransferNoteCreateDto request);
-    AmbulanceTransportDto createAmbulanceTransport(Long dispositionId, AmbulanceTransportCreateDto request);
+    AdmissionRequestDto createAdmissionRequest(String dispositionId, AdmissionRequestCreateDto request);
+    TransferNoteDto createTransferNote(String dispositionId, TransferNoteCreateDto request);
+    AmbulanceTransportDto createAmbulanceTransport(String dispositionId, AmbulanceTransportCreateDto request);
 }

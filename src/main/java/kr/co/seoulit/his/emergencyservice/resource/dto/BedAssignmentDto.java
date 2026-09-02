@@ -7,9 +7,9 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class BedAssignmentDto {
-    private Long id;
+    private String id;
     private String receptionNo;
-    private Long bedId;
+    private String bedId;
     private String bedNo;
     private String zoneCode;
     private String assignedById;

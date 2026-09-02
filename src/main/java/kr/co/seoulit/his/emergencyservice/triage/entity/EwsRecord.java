@@ -1,23 +1,25 @@
 package kr.co.seoulit.his.emergencyservice.triage.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "EWS_RECORD")
+@Table(schema = "EMERGENCY", name = "EWS_RECORD")
 @Getter
 @Setter
 public class EwsRecord {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "EWS_RECORD_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "EWS_RECORD_ID", length = 36)
+    private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "SYSTOLIC_BP")

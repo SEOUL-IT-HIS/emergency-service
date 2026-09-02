@@ -1,0 +1,7 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/api/emergency/triage/infection-isolations/{id}/release'
+order: 9000
+pathVariables:
+  - key: id
+    value: 'ISO-0001'

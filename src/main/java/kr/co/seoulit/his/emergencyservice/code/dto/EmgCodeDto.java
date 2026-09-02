@@ -6,7 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class EmgCodeDto {
-    private Long id;
+    private String id;
     private String groupCode;
     private String codeValue;
     private String codeName;

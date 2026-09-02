@@ -1,22 +1,24 @@
 package kr.co.seoulit.his.emergencyservice.triage.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMG", name = "ISOLATION_ASSESSMENT")
+@Table(schema = "EMERGENCY", name = "ISOLATION_ASSESSMENT")
 @Getter
 @Setter
 public class IsolationAssessment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ISOLATION_ASSESSMENT_ID")
-    private Long id;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "ISOLATION_ASSESSMENT_ID", length = 36)
+    private String id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
+    @Column(name = "RECEPTION_NO", length = 36)
     private String receptionNo;
 
     @Column(name = "ISOLATION_TYPE_CODE", length = 20)

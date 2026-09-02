@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class DispositionDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private String dispositionTypeCode;
     private String decidedById;

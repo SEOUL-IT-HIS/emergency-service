@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class OncallRequestDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private String targetRoleCode;
     private String calledById;

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class ConsultRequestDto {
-    private Long id;
+    private String id;
     private String receptionNo;
     private String targetDeptCode;
     private String consultStatusCode;

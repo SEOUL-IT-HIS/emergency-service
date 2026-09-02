@@ -20,6 +20,9 @@ app:
     allowed-origin-patterns:
       - http://localhost:3000
       - http://127.0.0.1:3000
+  admin:
+    # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
+    base-url: http://192.168.1.128:8080
 
 spring:
   application:
@@ -27,9 +30,9 @@ spring:
   config:
     import: optional:classpath:application-local.yml
   datasource:
-    url: jdbc:oracle:thin:@192.168.1.128:1521:XE
-    username: hospital
-    password: "1111"
+    url: jdbc:oracle:thin:@//seoulit.pe.kr:1521/FREEPDB1
+    username: emergency
+    password: "emergency"
     driver-class-name: oracle.jdbc.OracleDriver
   jpa:
     hibernate:
@@ -38,7 +41,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        default_schema: EMG
+        default_schema: EMERGENCY
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

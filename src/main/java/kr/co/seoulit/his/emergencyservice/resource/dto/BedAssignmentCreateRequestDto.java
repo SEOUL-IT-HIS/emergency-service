@@ -7,6 +7,6 @@ import lombok.Setter;
 @Setter
 public class BedAssignmentCreateRequestDto {
     private String encounterId;
-    private Long bedId;
+    private String bedId;
     private String assignedById;
 }

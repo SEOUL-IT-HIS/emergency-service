@@ -74,7 +74,7 @@ public class EmgCodeServiceImpl implements EmgCodeService {
 
     @Override
     @Transactional
-    public EmgCodeDto updateCode(Long codeId, EmgCodeUpdateRequestDto request) {
+    public EmgCodeDto updateCode(String codeId, EmgCodeUpdateRequestDto request) {
         EmgCode code = codeRepository.findById(codeId)
                 .orElseThrow(() -> ResourceNotFoundException.of("code", codeId));
         if (request.getCodeName() != null) {
@@ -92,7 +92,7 @@ public class EmgCodeServiceImpl implements EmgCodeService {
 
     @Override
     @Transactional
-    public EmgCodeDto updateUseYn(Long codeId, EmgCodeUseYnRequestDto request) {
+    public EmgCodeDto updateUseYn(String codeId, EmgCodeUseYnRequestDto request) {
         if (!"Y".equals(request.getUseYn()) && !"N".equals(request.getUseYn())) {
             throw new IllegalArgumentException("useYn must be Y or N");
         }

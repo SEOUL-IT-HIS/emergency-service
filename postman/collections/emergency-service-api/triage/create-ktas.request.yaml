@@ -1,0 +1,18 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/emergency/triage/ktas'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "patientId": "P20260001",
+      "encounterId": "ER-20260716-001",
+      "ktasScore": "2",
+      "assessmentTypeCode": "INITIAL",
+      "assessedById": "E0001",
+      "reason": "흉통"
+    }
