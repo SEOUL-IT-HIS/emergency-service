@@ -3,5 +3,5 @@ method: GET
 url: '{{baseUrl}}/api/emergency/triage/vital-assessments'
 order: 5000
 queryParams:
-  - key: receptionNo
+  - key: receptionId
     value: 'RCP-20260716-001'

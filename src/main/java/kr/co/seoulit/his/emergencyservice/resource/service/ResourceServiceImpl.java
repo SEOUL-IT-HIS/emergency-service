@@ -67,7 +67,7 @@ public class ResourceServiceImpl implements ResourceService {
             throw new ConflictException("bed already occupied: " + request.getBedId());
         }
         BedAssignment assignment = new BedAssignment();
-        assignment.setReceptionNo(request.getEncounterId());
+        assignment.setReceptionId(request.getEncounterId());
         assignment.setBed(bed);
         assignment.setAssignedById(request.getAssignedById());
         assignment.setAssignedAt(LocalDateTime.now());
@@ -80,7 +80,7 @@ public class ResourceServiceImpl implements ResourceService {
 
         BedAssignmentDto dto = new BedAssignmentDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setBedId(bed.getId());
         dto.setBedNo(bed.getBedNo());
         dto.setZoneCode(bed.getZoneCode());
@@ -101,7 +101,7 @@ public class ResourceServiceImpl implements ResourceService {
             throw new ConflictException("equipment already in use: " + request.getEquipmentId());
         }
         EquipmentAllocation allocation = new EquipmentAllocation();
-        allocation.setReceptionNo(request.getEncounterId());
+        allocation.setReceptionId(request.getEncounterId());
         allocation.setEquipment(equipment);
         allocation.setAllocatedById(request.getAllocatedById());
         allocation.setAllocatedAt(LocalDateTime.now());
@@ -114,7 +114,7 @@ public class ResourceServiceImpl implements ResourceService {
 
         EquipmentAllocationDto dto = new EquipmentAllocationDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setEquipmentId(equipment.getId());
         dto.setAssetNo(equipment.getAssetNo());
         dto.setAllocatedById(saved.getAllocatedById());

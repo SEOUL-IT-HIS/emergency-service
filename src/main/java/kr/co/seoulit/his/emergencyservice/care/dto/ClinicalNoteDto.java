@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class ClinicalNoteDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String content;
     private String recordedById;
     private LocalDateTime recordedAt;

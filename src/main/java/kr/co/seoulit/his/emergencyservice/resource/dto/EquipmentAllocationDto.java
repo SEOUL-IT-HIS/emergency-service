@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EquipmentAllocationDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String equipmentId;
     private String assetNo;
     private String allocatedById;

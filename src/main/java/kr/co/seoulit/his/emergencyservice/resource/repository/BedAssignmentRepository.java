@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface BedAssignmentRepository extends JpaRepository<BedAssignment, String> {
-    List<BedAssignment> findByReceptionNoAndReleasedAtIsNull(String receptionNo);
+    List<BedAssignment> findByReceptionIdAndReleasedAtIsNull(String receptionId);
 }

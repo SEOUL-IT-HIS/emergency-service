@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class TriageAssessmentDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String ktasLevelCode;
     private String assessmentTypeCode;
     private String assessedById;

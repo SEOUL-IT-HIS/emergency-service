@@ -37,21 +37,21 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EmsReferralDto> getEmsInfo(String receptionNo) {
-        if (StringUtils.hasText(receptionNo)) {
-            return triageMapper.toEmsDtoList(emsReferralRepository.findByReceptionNo(receptionNo));
+    public List<EmsReferralDto> getEmsInfo(String receptionId) {
+        if (StringUtils.hasText(receptionId)) {
+            return triageMapper.toEmsDtoList(emsReferralRepository.findByReceptionId(receptionId));
         }
         return triageMapper.toEmsDtoList(emsReferralRepository.findAll());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<TriageAssessmentDto> getKtasHistory(String receptionNo) {
-        if (!StringUtils.hasText(receptionNo)) {
-            throw new IllegalArgumentException("receptionNo is required");
+    public List<TriageAssessmentDto> getKtasHistory(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
         }
         return triageMapper.toKtasDtoList(
-                triageAssessmentRepository.findByReceptionNoOrderByAssessedAtAsc(receptionNo));
+                triageAssessmentRepository.findByReceptionIdOrderByAssessedAtAsc(receptionId));
     }
 
     @Override
@@ -66,14 +66,14 @@ public class TriageServiceImpl implements TriageService {
         String assessmentTypeCode =
                 StringUtils.hasText(request.getAssessmentTypeCode()) ? request.getAssessmentTypeCode() : "INITIAL";
         if ("INITIAL".equals(assessmentTypeCode)
-                && triageAssessmentRepository.existsByReceptionNoAndAssessmentTypeCode(
+                && triageAssessmentRepository.existsByReceptionIdAndAssessmentTypeCode(
                         request.getEncounterId(), "INITIAL")) {
             // 이미 최초 분류(INITIAL)가 등록된 접수 건입니다
             throw new ConflictException("Initial KTAS classification already registered for this encounter: " + request.getEncounterId());
         }
 
         TriageAssessment entity = new TriageAssessment();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setKtasLevelCode(request.getKtasScore());
         entity.setAssessmentTypeCode(assessmentTypeCode);
         entity.setAssessedById(request.getAssessedById());
@@ -102,7 +102,7 @@ public class TriageServiceImpl implements TriageService {
         }
 
         TriageAssessment entity = new TriageAssessment();
-        entity.setReceptionNo(previous.getReceptionNo());
+        entity.setReceptionId(previous.getReceptionId());
         entity.setKtasLevelCode(nextScore);
         entity.setAssessmentTypeCode("REASSESS");
         entity.setAssessedById(request.getAssessedById() != null ? request.getAssessedById() : previous.getAssessedById());
@@ -115,11 +115,11 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EwsRecordDto> getVitalAssessments(String receptionNo) {
-        if (!StringUtils.hasText(receptionNo)) {
-            throw new IllegalArgumentException("receptionNo is required");
+    public List<EwsRecordDto> getVitalAssessments(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
         }
-        return triageMapper.toEwsDtoList(ewsRecordRepository.findByReceptionNo(receptionNo));
+        return triageMapper.toEwsDtoList(ewsRecordRepository.findByReceptionId(receptionId));
     }
 
     @Override
@@ -132,7 +132,7 @@ public class TriageServiceImpl implements TriageService {
         for (VitalAssessmentCreateRequestDto.VitalItemDto vital : request.getVitals()) {
             validateVitalItem(vital);
             EwsRecord entity = new EwsRecord();
-            entity.setReceptionNo(request.getEncounterId());
+            entity.setReceptionId(request.getEncounterId());
             entity.setSystolicBp(vital.getSystolicBp());
             entity.setHeartRate(vital.getHeartRate());
             entity.setRespRate(vital.getRespRate());
@@ -179,11 +179,11 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<IsolationAssessmentDto> getIsolations(String receptionNo) {
-        if (!StringUtils.hasText(receptionNo)) {
-            throw new IllegalArgumentException("receptionNo is required");
+    public List<IsolationAssessmentDto> getIsolations(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
         }
-        return triageMapper.toIsolationDtoList(isolationAssessmentRepository.findByReceptionNo(receptionNo));
+        return triageMapper.toIsolationDtoList(isolationAssessmentRepository.findByReceptionId(receptionId));
     }
 
     @Override
@@ -199,20 +199,20 @@ public class TriageServiceImpl implements TriageService {
         if (!VALID_ISOLATION_YN.contains(requiredYn)) {
             throw new IllegalArgumentException("requiredYn must be Y or N");
         }
-        String receptionNo = StringUtils.hasText(request.getEncounterId())
+        String receptionId = StringUtils.hasText(request.getEncounterId())
                 ? request.getEncounterId() : request.getPatientId();
 
-        boolean hasActiveIsolation = isolationAssessmentRepository.findByReceptionNo(receptionNo).stream()
+        boolean hasActiveIsolation = isolationAssessmentRepository.findByReceptionId(receptionId).stream()
                 .anyMatch(existing -> existing.getReleasedAt() == null
                         && existing.getIsolationTypeCode().equals(request.getIsolationTypeCode()));
         if (hasActiveIsolation) {
             // 이미 활성 상태인 격리가 있습니다
             throw new ConflictException(
-                    "An active isolation (" + request.getIsolationTypeCode() + ") already exists: " + receptionNo);
+                    "An active isolation (" + request.getIsolationTypeCode() + ") already exists: " + receptionId);
         }
 
         IsolationAssessment entity = new IsolationAssessment();
-        entity.setReceptionNo(receptionNo);
+        entity.setReceptionId(receptionId);
         entity.setIsolationTypeCode(request.getIsolationTypeCode());
         entity.setRequiredYn(requiredYn);
         entity.setDecidedById(request.getDecidedById());
@@ -238,11 +238,11 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RiskScreeningDto> getRiskScreenings(String receptionNo) {
-        if (!StringUtils.hasText(receptionNo)) {
-            throw new IllegalArgumentException("receptionNo is required");
+    public List<RiskScreeningDto> getRiskScreenings(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
         }
-        return triageMapper.toRiskDtoList(riskScreeningRepository.findByReceptionNo(receptionNo));
+        return triageMapper.toRiskDtoList(riskScreeningRepository.findByReceptionId(receptionId));
     }
 
     @Override
@@ -259,7 +259,7 @@ public class TriageServiceImpl implements TriageService {
         }
 
         RiskScreening entity = new RiskScreening();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setScreeningTypeCode(request.getScreenType());
         entity.setScore(request.getScore());
         entity.setResultCode(request.getResultCode());

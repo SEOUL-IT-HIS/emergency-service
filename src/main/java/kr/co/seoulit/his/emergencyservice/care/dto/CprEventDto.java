@@ -9,7 +9,7 @@ import java.util.List;
 @Setter
 public class CprEventDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private String outcomeCode;

@@ -29,7 +29,7 @@ public class MonitorServiceImpl implements MonitorService {
 
         DashboardDto dto = new DashboardDto();
         dto.setTotalPatients(triageAssessmentRepository.findAll().stream()
-                .map(a -> a.getReceptionNo()).distinct().count());
+                .map(a -> a.getReceptionId()).distinct().count());
         dto.setOccupiedBeds(congestion.getOccupiedBeds());
         dto.setEmptyBeds(congestion.getEmptyBeds());
         dto.setOpenLosAlerts(openAlerts.size());
@@ -64,7 +64,7 @@ public class MonitorServiceImpl implements MonitorService {
     private LosAlertDto toDto(LosAlert entity) {
         LosAlertDto dto = new LosAlertDto();
         dto.setId(entity.getId());
-        dto.setReceptionNo(entity.getReceptionNo());
+        dto.setReceptionId(entity.getReceptionId());
         dto.setThresholdMinutes(entity.getThresholdMinutes());
         dto.setTriggeredAt(entity.getTriggeredAt());
         return dto;

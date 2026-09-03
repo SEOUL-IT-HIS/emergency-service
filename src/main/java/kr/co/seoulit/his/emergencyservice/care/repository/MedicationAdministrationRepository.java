@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface MedicationAdministrationRepository extends JpaRepository<MedicationAdministration, String> {
-    List<MedicationAdministration> findByReceptionNo(String receptionNo);
+    List<MedicationAdministration> findByReceptionId(String receptionId);
 }

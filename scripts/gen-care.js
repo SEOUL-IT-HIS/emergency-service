@@ -37,8 +37,8 @@ public class ClinicalNote {
     @Column(name = "CLINICAL_NOTE_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "RECORDED_BY_ID", length = 36)
     private String recordedById;
@@ -73,8 +73,8 @@ public class TreatmentRecord {
     @Column(name = "TREATMENT_RECORD_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ORDER_ID")
     private Long orderId;
@@ -112,8 +112,8 @@ public class MedicationAdministration {
     @Column(name = "MEDICATION_ADMINISTRATION_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ORDER_ID", nullable = false)
     private Long orderId;
@@ -159,8 +159,8 @@ public class CprEvent {
     @Column(name = "CPR_EVENT_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "STARTED_AT")
     private LocalDateTime startedAt;
@@ -222,7 +222,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ${name}Repository extends JpaRepository<${name}, Long> {
-    List<${name}> findByReceptionNo(String receptionNo);
+    List<${name}> findByReceptionId(String receptionId);
 }
 `);
 });
@@ -236,7 +236,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class EmergencyPatientDto {
-    private String receptionNo;
+    private String receptionId;
     private String ktasLevelCode;
     private String careStatusCode;
     private String bedNo;
@@ -269,7 +269,7 @@ import java.time.LocalDateTime;
 @Setter
 public class ClinicalNoteDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String content;
     private String recordedById;
     private LocalDateTime recordedAt;
@@ -302,7 +302,7 @@ import java.time.LocalDateTime;
 @Setter
 public class TreatmentRecordDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Long orderId;
     private String treatmentTypeCode;
     private String description;
@@ -341,7 +341,7 @@ import java.time.LocalDateTime;
 @Setter
 public class MarDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Long orderId;
     private Long orderItemId;
     private String drugCode;
@@ -388,7 +388,7 @@ import java.util.List;
 @Setter
 public class CprEventDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private String outcomeCode;
@@ -476,7 +476,7 @@ public class CareServiceImpl implements CareService {
         List<TriageAssessment> assessments = triageAssessmentRepository.findAll();
         Map<String, TriageAssessment> latestByReception = new LinkedHashMap<>();
         for (TriageAssessment assessment : assessments) {
-            if (!StringUtils.hasText(assessment.getReceptionNo())) {
+            if (!StringUtils.hasText(assessment.getReceptionId())) {
                 continue;
             }
             if (StringUtils.hasText(date)) {
@@ -486,23 +486,23 @@ public class CareServiceImpl implements CareService {
                     continue;
                 }
             }
-            TriageAssessment existing = latestByReception.get(assessment.getReceptionNo());
+            TriageAssessment existing = latestByReception.get(assessment.getReceptionId());
             if (existing == null
                     || (assessment.getAssessedAt() != null
                     && (existing.getAssessedAt() == null
                     || assessment.getAssessedAt().isAfter(existing.getAssessedAt())))) {
-                latestByReception.put(assessment.getReceptionNo(), assessment);
+                latestByReception.put(assessment.getReceptionId(), assessment);
             }
         }
 
         return latestByReception.values().stream().map(assessment -> {
             EmergencyPatientDto dto = new EmergencyPatientDto();
-            dto.setReceptionNo(assessment.getReceptionNo());
+            dto.setReceptionId(assessment.getReceptionId());
             dto.setKtasLevelCode(assessment.getKtasLevelCode());
             dto.setLastAssessedAt(assessment.getAssessedAt());
             dto.setCareStatusCode("IN_CARE");
             List<BedAssignment> beds =
-                    bedAssignmentRepository.findByReceptionNoAndReleasedAtIsNull(assessment.getReceptionNo());
+                    bedAssignmentRepository.findByReceptionIdAndReleasedAtIsNull(assessment.getReceptionId());
             if (!beds.isEmpty() && beds.get(0).getBed() != null) {
                 dto.setBedNo(beds.get(0).getBed().getBedNo());
                 dto.setZoneCode(beds.get(0).getBed().getZoneCode());
@@ -519,7 +519,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and content are required");
         }
         ClinicalNote entity = new ClinicalNote();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setContent(request.getContent());
         entity.setRecordedById(request.getRecordedById());
         entity.setRecordedAt(LocalDateTime.now());
@@ -535,7 +535,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and treatmentCode are required");
         }
         TreatmentRecord entity = new TreatmentRecord();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
         entity.setTreatmentTypeCode(request.getTreatmentCode());
         entity.setDescription(request.getDescription());
@@ -554,7 +554,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId, orderId, administeredAt, dose are required");
         }
         MedicationAdministration entity = new MedicationAdministration();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
         entity.setOrderItemId(request.getOrderItemId());
         entity.setDrugCode(request.getDrugCode());
@@ -575,7 +575,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and events[] are required");
         }
         CprEvent event = new CprEvent();
-        event.setReceptionNo(request.getEncounterId());
+        event.setReceptionId(request.getEncounterId());
         event.setStartedAt(LocalDateTime.now());
         event.setOutcomeCode(request.getOutcomeCode());
         event.setCreatedAt(LocalDateTime.now());
@@ -596,7 +596,7 @@ public class CareServiceImpl implements CareService {
         CprEvent saved = cprEventRepository.save(event);
         CprEventDto dto = new CprEventDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setStartedAt(saved.getStartedAt());
         dto.setEndedAt(saved.getEndedAt());
         dto.setOutcomeCode(saved.getOutcomeCode());

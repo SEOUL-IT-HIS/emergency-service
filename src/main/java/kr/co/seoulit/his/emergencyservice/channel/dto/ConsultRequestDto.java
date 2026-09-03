@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class ConsultRequestDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String targetDeptCode;
     private String consultStatusCode;
     private String reason;

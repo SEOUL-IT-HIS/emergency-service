@@ -18,8 +18,8 @@ public class IsolationAssessment {
     @Column(name = "ISOLATION_ASSESSMENT_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @Column(name = "ISOLATION_TYPE_CODE", length = 20)
     private String isolationTypeCode;

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class EmergencyPatientDto {
-    private String receptionNo;
+    private String receptionId;
     private String patientName;
     private String ktasLevelCode;
     private String careStatusCode;

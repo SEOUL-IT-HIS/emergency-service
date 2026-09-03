@@ -27,7 +27,7 @@ public class DispositionServiceImpl implements DispositionService {
             throw new IllegalArgumentException("encounterId and dispositionType are required");
         }
         Disposition entity = new Disposition();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setDispositionTypeCode(request.getDispositionType());
         entity.setDecidedById(request.getDecidedById());
         entity.setDecidedAt(LocalDateTime.now());
@@ -117,7 +117,7 @@ public class DispositionServiceImpl implements DispositionService {
     private DispositionDto toDispositionDto(Disposition entity) {
         DispositionDto dto = new DispositionDto();
         dto.setId(entity.getId());
-        dto.setReceptionNo(entity.getReceptionNo());
+        dto.setReceptionId(entity.getReceptionId());
         dto.setDispositionTypeCode(entity.getDispositionTypeCode());
         dto.setDecidedById(entity.getDecidedById());
         dto.setDecidedAt(entity.getDecidedAt());

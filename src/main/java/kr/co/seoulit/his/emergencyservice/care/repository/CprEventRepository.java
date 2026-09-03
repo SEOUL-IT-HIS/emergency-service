@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface CprEventRepository extends JpaRepository<CprEvent, String> {
-    List<CprEvent> findByReceptionNo(String receptionNo);
+    List<CprEvent> findByReceptionId(String receptionId);
 }

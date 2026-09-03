@@ -37,8 +37,8 @@ public class Disposition {
     @Column(name = "DISPOSITION_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "DISPOSITION_TYPE_CODE", length = 20)
     private String dispositionTypeCode;
@@ -223,7 +223,7 @@ import java.time.LocalDateTime;
 @Setter
 public class DispositionDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String dispositionTypeCode;
     private String decidedById;
     private LocalDateTime decidedAt;
@@ -368,7 +368,7 @@ public class DispositionServiceImpl implements DispositionService {
             throw new IllegalArgumentException("encounterId and dispositionType are required");
         }
         Disposition entity = new Disposition();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setDispositionTypeCode(request.getDispositionType());
         entity.setDecidedById(request.getDecidedById());
         entity.setDecidedAt(LocalDateTime.now());
@@ -458,7 +458,7 @@ public class DispositionServiceImpl implements DispositionService {
     private DispositionDto toDispositionDto(Disposition entity) {
         DispositionDto dto = new DispositionDto();
         dto.setId(entity.getId());
-        dto.setReceptionNo(entity.getReceptionNo());
+        dto.setReceptionId(entity.getReceptionId());
         dto.setDispositionTypeCode(entity.getDispositionTypeCode());
         dto.setDecidedById(entity.getDecidedById());
         dto.setDecidedAt(entity.getDecidedAt());

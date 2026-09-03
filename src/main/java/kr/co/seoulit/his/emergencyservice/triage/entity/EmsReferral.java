@@ -18,8 +18,8 @@ public class EmsReferral {
     @Column(name = "EMS_REFERRAL_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @Column(name = "EMS_AGENCY_NAME", length = 100)
     private String emsAgencyName;

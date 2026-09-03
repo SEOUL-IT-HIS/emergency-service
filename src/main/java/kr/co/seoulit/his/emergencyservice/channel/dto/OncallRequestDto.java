@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class OncallRequestDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String targetRoleCode;
     private String calledById;
     private LocalDateTime calledAt;

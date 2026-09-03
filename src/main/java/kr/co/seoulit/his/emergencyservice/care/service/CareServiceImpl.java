@@ -36,7 +36,7 @@ public class CareServiceImpl implements CareService {
         List<TriageAssessment> assessments = triageAssessmentRepository.findAll();
         Map<String, TriageAssessment> latestByReception = new LinkedHashMap<>();
         for (TriageAssessment assessment : assessments) {
-            if (!StringUtils.hasText(assessment.getReceptionNo())) {
+            if (!StringUtils.hasText(assessment.getReceptionId())) {
                 continue;
             }
             if (StringUtils.hasText(date)) {
@@ -46,25 +46,25 @@ public class CareServiceImpl implements CareService {
                     continue;
                 }
             }
-            TriageAssessment existing = latestByReception.get(assessment.getReceptionNo());
+            TriageAssessment existing = latestByReception.get(assessment.getReceptionId());
             if (existing == null
                     || (assessment.getAssessedAt() != null
                     && (existing.getAssessedAt() == null
                     || assessment.getAssessedAt().isAfter(existing.getAssessedAt())))) {
-                latestByReception.put(assessment.getReceptionNo(), assessment);
+                latestByReception.put(assessment.getReceptionId(), assessment);
             }
         }
 
         return latestByReception.values().stream().map(assessment -> {
             EmergencyPatientDto dto = new EmergencyPatientDto();
-            dto.setReceptionNo(assessment.getReceptionNo());
+            dto.setReceptionId(assessment.getReceptionId());
             // TODO PAT 연동 전 임시값. PAT batch-query로 실제 환자명 채울 것.
-            dto.setPatientName(mockPatientName(assessment.getReceptionNo()));
+            dto.setPatientName(mockPatientName(assessment.getReceptionId()));
             dto.setKtasLevelCode(assessment.getKtasLevelCode());
             dto.setLastAssessedAt(assessment.getAssessedAt());
             dto.setCareStatusCode("IN_CARE");
             List<BedAssignment> beds =
-                    bedAssignmentRepository.findByReceptionNoAndReleasedAtIsNull(assessment.getReceptionNo());
+                    bedAssignmentRepository.findByReceptionIdAndReleasedAtIsNull(assessment.getReceptionId());
             if (!beds.isEmpty() && beds.get(0).getBed() != null) {
                 dto.setBedNo(beds.get(0).getBed().getBedNo());
                 dto.setZoneCode(beds.get(0).getBed().getZoneCode());
@@ -80,8 +80,8 @@ public class CareServiceImpl implements CareService {
             "ER-20260716-003", "이철수"
     );
 
-    private String mockPatientName(String receptionNo) {
-        return MOCK_PATIENT_NAMES.getOrDefault(receptionNo, "환자(" + receptionNo + ")");
+    private String mockPatientName(String receptionId) {
+        return MOCK_PATIENT_NAMES.getOrDefault(receptionId, "환자(" + receptionId + ")");
     }
 
     @Override
@@ -91,7 +91,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and content are required");
         }
         ClinicalNote entity = new ClinicalNote();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setContent(request.getContent());
         entity.setRecordedById(request.getRecordedById());
         entity.setRecordedAt(LocalDateTime.now());
@@ -107,7 +107,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and treatmentCode are required");
         }
         TreatmentRecord entity = new TreatmentRecord();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
         entity.setTreatmentTypeCode(request.getTreatmentCode());
         entity.setDescription(request.getDescription());
@@ -126,7 +126,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId, orderId, administeredAt, dose are required");
         }
         MedicationAdministration entity = new MedicationAdministration();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
         entity.setOrderItemId(request.getOrderItemId());
         entity.setDrugCode(request.getDrugCode());
@@ -147,7 +147,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and events[] are required");
         }
         CprEvent event = new CprEvent();
-        event.setReceptionNo(request.getEncounterId());
+        event.setReceptionId(request.getEncounterId());
         event.setStartedAt(LocalDateTime.now());
         event.setOutcomeCode(request.getOutcomeCode());
         event.setCreatedAt(LocalDateTime.now());
@@ -168,7 +168,7 @@ public class CareServiceImpl implements CareService {
         CprEvent saved = cprEventRepository.save(event);
         CprEventDto dto = new CprEventDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setStartedAt(saved.getStartedAt());
         dto.setEndedAt(saved.getEndedAt());
         dto.setOutcomeCode(saved.getOutcomeCode());

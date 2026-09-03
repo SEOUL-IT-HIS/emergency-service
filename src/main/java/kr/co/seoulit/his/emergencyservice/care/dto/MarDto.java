@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class MarDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private Long orderId;
     private Long orderItemId;
     private String drugCode;

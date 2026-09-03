@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class DispositionDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String dispositionTypeCode;
     private String decidedById;
     private LocalDateTime decidedAt;

@@ -70,8 +70,8 @@ public class BedAssignment {
     @Column(name = "BED_ASSIGNMENT_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "BED_ID", nullable = false)
@@ -137,8 +137,8 @@ public class EquipmentAllocation {
     @Column(name = "EQUIPMENT_ALLOCATION_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "EQUIPMENT_ID", nullable = false)
@@ -175,7 +175,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface BedAssignmentRepository extends JpaRepository<BedAssignment, Long> {
-    List<BedAssignment> findByReceptionNoAndReleasedAtIsNull(String receptionNo);
+    List<BedAssignment> findByReceptionIdAndReleasedAtIsNull(String receptionId);
 }
 `);
 
@@ -236,7 +236,7 @@ import java.time.LocalDateTime;
 @Setter
 public class BedAssignmentDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Long bedId;
     private String bedNo;
     private String zoneCode;
@@ -269,7 +269,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EquipmentAllocationDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Long equipmentId;
     private String assetNo;
     private String allocatedById;
@@ -332,7 +332,7 @@ public class ResourceServiceImpl implements ResourceService {
         Bed bed = bedRepository.findById(request.getBedId())
                 .orElseThrow(() -> new IllegalArgumentException("bed not found: " + request.getBedId()));
         BedAssignment assignment = new BedAssignment();
-        assignment.setReceptionNo(request.getEncounterId());
+        assignment.setReceptionId(request.getEncounterId());
         assignment.setBed(bed);
         assignment.setAssignedById(request.getAssignedById());
         assignment.setAssignedAt(LocalDateTime.now());
@@ -345,7 +345,7 @@ public class ResourceServiceImpl implements ResourceService {
 
         BedAssignmentDto dto = new BedAssignmentDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setBedId(bed.getId());
         dto.setBedNo(bed.getBedNo());
         dto.setZoneCode(bed.getZoneCode());
@@ -363,7 +363,7 @@ public class ResourceServiceImpl implements ResourceService {
         Equipment equipment = equipmentRepository.findById(request.getEquipmentId())
                 .orElseThrow(() -> new IllegalArgumentException("equipment not found: " + request.getEquipmentId()));
         EquipmentAllocation allocation = new EquipmentAllocation();
-        allocation.setReceptionNo(request.getEncounterId());
+        allocation.setReceptionId(request.getEncounterId());
         allocation.setEquipment(equipment);
         allocation.setAllocatedById(request.getAllocatedById());
         allocation.setAllocatedAt(LocalDateTime.now());
@@ -376,7 +376,7 @@ public class ResourceServiceImpl implements ResourceService {
 
         EquipmentAllocationDto dto = new EquipmentAllocationDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setEquipmentId(equipment.getId());
         dto.setAssetNo(equipment.getAssetNo());
         dto.setAllocatedById(saved.getAllocatedById());

@@ -18,8 +18,8 @@ public class TriageAssessment {
     @Column(name = "TRIAGE_ASSESSMENT_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @Column(name = "KTAS_LEVEL_CODE", length = 10)
     private String ktasLevelCode;
