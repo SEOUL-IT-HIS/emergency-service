@@ -9,4 +9,5 @@ public interface CareService {
     TreatmentRecordDto createTreatment(TreatmentCreateRequestDto request);
     MarDto createMar(MarCreateRequestDto request);
     CprEventDto createCprTimeline(CprTimelineCreateRequestDto request);
+    ReceptionIntakeDto createReceptionIntake(ReceptionIntakeCreateRequestDto request);
 }

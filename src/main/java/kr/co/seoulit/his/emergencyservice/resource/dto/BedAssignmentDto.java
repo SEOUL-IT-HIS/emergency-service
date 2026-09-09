@@ -14,4 +14,6 @@ public class BedAssignmentDto {
     private String zoneCode;
     private String assignedById;
     private LocalDateTime assignedAt;
+    private String releasedById;
+    private LocalDateTime releasedAt;
 }

@@ -38,6 +38,14 @@ public class ResourceController {
         return ApiResponse.success(resourceService.assignBed(request));
     }
 
+    @Operation(summary = "구역-병상 배정 해제", description = "UC-RES-02 · 병상 해제 (환자 퇴실/전실 시)")
+    @PatchMapping("/bed-assignments/{assignmentId}/release")
+    public ApiResponse<BedAssignmentDto> releaseBed(
+            @PathVariable String assignmentId,
+            @RequestBody BedReleaseRequestDto request) {
+        return ApiResponse.success(resourceService.releaseBed(assignmentId, request));
+    }
+
     @Operation(summary = "응급 의료기기 할당", description = "UC-RES-03 · 기기 배당")
     @PostMapping("/equipment-assignments")
     public ApiResponse<EquipmentAllocationDto> assignEquipment(

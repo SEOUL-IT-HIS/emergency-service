@@ -8,5 +8,6 @@ public interface ResourceService {
     CongestionDto getCongestion();
     List<BedDto> getBeds(String zoneCode, String status);
     BedAssignmentDto assignBed(BedAssignmentCreateRequestDto request);
+    BedAssignmentDto releaseBed(String assignmentId, BedReleaseRequestDto request);
     EquipmentAllocationDto assignEquipment(EquipmentAssignmentCreateRequestDto request);
 }

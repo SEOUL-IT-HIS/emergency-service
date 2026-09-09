@@ -91,6 +91,38 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     @Transactional
+    public BedAssignmentDto releaseBed(String assignmentId, BedReleaseRequestDto request) {
+        if (!StringUtils.hasText(request.getReleasedById())) {
+            throw new IllegalArgumentException("releasedById is required");
+        }
+        BedAssignment assignment = bedAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("bedAssignment", assignmentId));
+        if (assignment.getReleasedAt() != null) {
+            throw new ConflictException("bed assignment already released: " + assignmentId);
+        }
+        assignment.setReleasedById(request.getReleasedById());
+        assignment.setReleasedAt(LocalDateTime.now());
+        assignment.setUpdatedAt(LocalDateTime.now());
+
+        Bed bed = assignment.getBed();
+        bed.setBedStatusCode("EMPTY");
+        bed.setUpdatedAt(LocalDateTime.now());
+
+        BedAssignmentDto dto = new BedAssignmentDto();
+        dto.setId(assignment.getId());
+        dto.setReceptionId(assignment.getReceptionId());
+        dto.setBedId(bed.getId());
+        dto.setBedNo(bed.getBedNo());
+        dto.setZoneCode(bed.getZoneCode());
+        dto.setAssignedById(assignment.getAssignedById());
+        dto.setAssignedAt(assignment.getAssignedAt());
+        dto.setReleasedById(assignment.getReleasedById());
+        dto.setReleasedAt(assignment.getReleasedAt());
+        return dto;
+    }
+
+    @Override
+    @Transactional
     public EquipmentAllocationDto assignEquipment(EquipmentAssignmentCreateRequestDto request) {
         if (!StringUtils.hasText(request.getEncounterId()) || request.getEquipmentId() == null) {
             throw new IllegalArgumentException("encounterId and equipmentId are required");

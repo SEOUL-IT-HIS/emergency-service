@@ -31,6 +31,9 @@ public class BedAssignment {
     @Column(name = "ASSIGNED_AT")
     private LocalDateTime assignedAt;
 
+    @Column(name = "RELEASED_BY_ID", length = 36)
+    private String releasedById;
+
     @Column(name = "RELEASED_AT")
     private LocalDateTime releasedAt;
 

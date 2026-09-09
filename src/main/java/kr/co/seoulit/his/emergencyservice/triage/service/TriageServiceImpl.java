@@ -25,6 +25,9 @@ public class TriageServiceImpl implements TriageService {
     private static final Set<String> VALID_ISOLATION_YN = Set.of("Y", "N");
     private static final Set<String> VALID_SCREEN_TYPES = Set.of("SEPSIS", "STROKE");
     private static final Set<String> VALID_SCREEN_RESULTS = Set.of("NEGATIVE", "POSITIVE", "INCONCLUSIVE");
+    // TODO: ASSESSMENT_TYPE, ISOLATION_TYPE이 admin 공통코드로 이관되면(21.4) CommonCodeCache 조회로 교체
+    private static final Set<String> VALID_ASSESSMENT_TYPES = Set.of("INITIAL");
+    private static final Set<String> VALID_ISOLATION_TYPES = Set.of("CONTACT", "DROPLET", "AIRBORNE", "PROTECTIVE");
 
     private final EmsReferralRepository emsReferralRepository;
 
@@ -57,14 +60,18 @@ public class TriageServiceImpl implements TriageService {
     @Override
     @Transactional
     public TriageAssessmentDto createKtas(KtasCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getKtasScore())) {
-            throw new IllegalArgumentException("encounterId and ktasScore are required");
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getKtasScore())
+                || !StringUtils.hasText(request.getAssessedById())) {
+            throw new IllegalArgumentException("encounterId, ktasScore, assessedById are required");
         }
         if (!VALID_KTAS_SCORES.contains(request.getKtasScore())) {
             throw new IllegalArgumentException("ktasScore must be one of 1~5");
         }
         String assessmentTypeCode =
                 StringUtils.hasText(request.getAssessmentTypeCode()) ? request.getAssessmentTypeCode() : "INITIAL";
+        if (!VALID_ASSESSMENT_TYPES.contains(assessmentTypeCode)) {
+            throw new IllegalArgumentException("assessmentTypeCode must be INITIAL");
+        }
         if ("INITIAL".equals(assessmentTypeCode)
                 && triageAssessmentRepository.existsByReceptionIdAndAssessmentTypeCode(
                         request.getEncounterId(), "INITIAL")) {
@@ -125,8 +132,9 @@ public class TriageServiceImpl implements TriageService {
     @Override
     @Transactional
     public List<EwsRecordDto> createVitalAssessments(VitalAssessmentCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || request.getVitals() == null || request.getVitals().isEmpty()) {
-            throw new IllegalArgumentException("encounterId and vitals[] are required");
+        if (!StringUtils.hasText(request.getEncounterId()) || request.getVitals() == null || request.getVitals().isEmpty()
+                || !StringUtils.hasText(request.getMeasuredById())) {
+            throw new IllegalArgumentException("encounterId, vitals[], measuredById are required");
         }
         List<EwsRecord> saved = new ArrayList<>();
         for (VitalAssessmentCreateRequestDto.VitalItemDto vital : request.getVitals()) {
@@ -195,6 +203,12 @@ public class TriageServiceImpl implements TriageService {
         if (!StringUtils.hasText(request.getIsolationTypeCode())) {
             throw new IllegalArgumentException("isolationTypeCode is required");
         }
+        if (!VALID_ISOLATION_TYPES.contains(request.getIsolationTypeCode())) {
+            throw new IllegalArgumentException("isolationTypeCode must be one of CONTACT, DROPLET, AIRBORNE, PROTECTIVE");
+        }
+        if (!StringUtils.hasText(request.getDecidedById())) {
+            throw new IllegalArgumentException("decidedById is required");
+        }
         String requiredYn = StringUtils.hasText(request.getRequiredYn()) ? request.getRequiredYn() : "Y";
         if (!VALID_ISOLATION_YN.contains(requiredYn)) {
             throw new IllegalArgumentException("requiredYn must be Y or N");
@@ -248,8 +262,9 @@ public class TriageServiceImpl implements TriageService {
     @Override
     @Transactional
     public RiskScreeningDto createRiskScreening(RiskScreeningCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getScreenType())) {
-            throw new IllegalArgumentException("encounterId and screenType are required");
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getScreenType())
+                || !StringUtils.hasText(request.getScreenedById())) {
+            throw new IllegalArgumentException("encounterId, screenType, screenedById are required");
         }
         if (!VALID_SCREEN_TYPES.contains(request.getScreenType())) {
             throw new IllegalArgumentException("screenType must be one of SEPSIS, STROKE");

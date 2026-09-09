@@ -22,12 +22,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CareServiceImpl implements CareService {
 
+    // TODO: ARRIVAL_PATH가 admin 공통코드로 이관되면(개발표준가이드 21.4) CommonCodeCache 조회로 교체
+    private static final Set<String> VALID_ARRIVAL_PATHS =
+            Set.of("EMS_119", "WALK_IN", "TRANSFER_IN", "SELF_TRANSPORT");
+
     private final ClinicalNoteRepository clinicalNoteRepository;
     private final TreatmentRecordRepository treatmentRecordRepository;
     private final MedicationAdministrationRepository medicationAdministrationRepository;
     private final CprEventRepository cprEventRepository;
     private final TriageAssessmentRepository triageAssessmentRepository;
     private final BedAssignmentRepository bedAssignmentRepository;
+    private final ReceptionIntakeRepository receptionIntakeRepository;
     private final CareMapstructMapper careMapper;
 
     @Override
@@ -58,8 +63,14 @@ public class CareServiceImpl implements CareService {
         return latestByReception.values().stream().map(assessment -> {
             EmergencyPatientDto dto = new EmergencyPatientDto();
             dto.setReceptionId(assessment.getReceptionId());
-            // TODO PAT 연동 전 임시값. PAT batch-query로 실제 환자명 채울 것.
-            dto.setPatientName(mockPatientName(assessment.getReceptionId()));
+            ReceptionIntake intake = receptionIntakeRepository.findById(assessment.getReceptionId()).orElse(null);
+            if (intake != null) {
+                dto.setPatientName(intake.getPatientName());
+                dto.setReceivedAt(intake.getReceivedAt());
+            } else {
+                // TODO RCP 연동 전(또는 미수신 건) 임시값. RCP가 reception-intakes를 호출하면 위 분기로 채워짐.
+                dto.setPatientName(mockPatientName(assessment.getReceptionId()));
+            }
             dto.setKtasLevelCode(assessment.getKtasLevelCode());
             dto.setLastAssessedAt(assessment.getAssessedAt());
             dto.setCareStatusCode("IN_CARE");
@@ -87,8 +98,9 @@ public class CareServiceImpl implements CareService {
     @Override
     @Transactional
     public ClinicalNoteDto createRecord(ClinicalNoteCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getContent())) {
-            throw new IllegalArgumentException("encounterId and content are required");
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getContent())
+                || !StringUtils.hasText(request.getRecordedById())) {
+            throw new IllegalArgumentException("encounterId, content, recordedById are required");
         }
         ClinicalNote entity = new ClinicalNote();
         entity.setReceptionId(request.getEncounterId());
@@ -103,8 +115,12 @@ public class CareServiceImpl implements CareService {
     @Override
     @Transactional
     public TreatmentRecordDto createTreatment(TreatmentCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getTreatmentCode())) {
-            throw new IllegalArgumentException("encounterId and treatmentCode are required");
+        // orderId 필수 검증: CLAUDE.md 12장 "투여/처치 기록(UC-CARE-03/04)에는 orderId 필수 검증 포함" 규정
+        if (!StringUtils.hasText(request.getEncounterId()) || request.getOrderId() == null
+                || !StringUtils.hasText(request.getTreatmentCode())
+                || !StringUtils.hasText(request.getPerformedById())) {
+            throw new IllegalArgumentException(
+                    "encounterId, orderId, treatmentCode, performedById are required");
         }
         TreatmentRecord entity = new TreatmentRecord();
         entity.setReceptionId(request.getEncounterId());
@@ -122,8 +138,11 @@ public class CareServiceImpl implements CareService {
     @Transactional
     public MarDto createMar(MarCreateRequestDto request) {
         if (!StringUtils.hasText(request.getEncounterId()) || request.getOrderId() == null
-                || request.getAdministeredAt() == null || !StringUtils.hasText(request.getDose())) {
-            throw new IllegalArgumentException("encounterId, orderId, administeredAt, dose are required");
+                || request.getAdministeredAt() == null || !StringUtils.hasText(request.getDose())
+                || !StringUtils.hasText(request.getDrugCode()) || !StringUtils.hasText(request.getRouteCode())
+                || !StringUtils.hasText(request.getAdministeredById())) {
+            throw new IllegalArgumentException(
+                    "encounterId, orderId, administeredAt, dose, drugCode, routeCode, administeredById are required");
         }
         MedicationAdministration entity = new MedicationAdministration();
         entity.setReceptionId(request.getEncounterId());
@@ -154,6 +173,9 @@ public class CareServiceImpl implements CareService {
         event.setUpdatedAt(LocalDateTime.now());
 
         for (CprTimelineCreateRequestDto.CprEventItemDto item : request.getEvents()) {
+            if (!StringUtils.hasText(item.getEventTypeCode()) || !StringUtils.hasText(item.getRecordedById())) {
+                throw new IllegalArgumentException("each event requires eventTypeCode and recordedById");
+            }
             CprTimeline timeline = new CprTimeline();
             timeline.setCprEvent(event);
             timeline.setEventAt(item.getEventAt() != null ? item.getEventAt() : LocalDateTime.now());
@@ -181,6 +203,51 @@ public class CareServiceImpl implements CareService {
             item.setRecordedById(t.getRecordedById());
             return item;
         }).collect(Collectors.toList()));
+        return dto;
+    }
+
+    @Override
+    @Transactional
+    public ReceptionIntakeDto createReceptionIntake(ReceptionIntakeCreateRequestDto request) {
+        if (!StringUtils.hasText(request.getReceptionId())
+                || !StringUtils.hasText(request.getPatientId())
+                || !StringUtils.hasText(request.getPatientName())
+                || !StringUtils.hasText(request.getArrivalPath())
+                || request.getReceivedAt() == null) {
+            throw new IllegalArgumentException(
+                    "receptionId, patientId, patientName, arrivalPath, receivedAt are required");
+        }
+        if (!VALID_ARRIVAL_PATHS.contains(request.getArrivalPath())) {
+            throw new IllegalArgumentException(
+                    "arrivalPath must be one of EMS_119, WALK_IN, TRANSFER_IN, SELF_TRANSPORT");
+        }
+
+        ReceptionIntake intake = receptionIntakeRepository.findById(request.getReceptionId())
+                .orElseGet(ReceptionIntake::new);
+        boolean isNew = intake.getId() == null;
+
+        intake.setId(request.getReceptionId());
+        intake.setPatientId(request.getPatientId());
+        intake.setPatientName(request.getPatientName());
+        intake.setArrivalPath(request.getArrivalPath());
+        intake.setReceivedAt(request.getReceivedAt());
+        intake.setMemo(request.getMemo());
+        intake.setChiefComplaintRaw(request.getChiefComplaintRaw());
+        intake.setUpdatedAt(LocalDateTime.now());
+        if (isNew) {
+            intake.setCreatedAt(LocalDateTime.now());
+        }
+
+        ReceptionIntake saved = receptionIntakeRepository.save(intake);
+
+        ReceptionIntakeDto dto = new ReceptionIntakeDto();
+        dto.setReceptionId(saved.getId());
+        dto.setPatientId(saved.getPatientId());
+        dto.setPatientName(saved.getPatientName());
+        dto.setArrivalPath(saved.getArrivalPath());
+        dto.setReceivedAt(saved.getReceivedAt());
+        dto.setMemo(saved.getMemo());
+        dto.setChiefComplaintRaw(saved.getChiefComplaintRaw());
         return dto;
     }
 }
