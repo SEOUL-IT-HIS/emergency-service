@@ -6,13 +6,12 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-public class EmergencyPatientDto {
+public class ReceptionIntakeCreateRequestDto {
     private String receptionId;
+    private String patientId;
     private String patientName;
+    private String arrivalPath;
     private LocalDateTime receivedAt;
-    private String ktasLevelCode;
-    private String careStatusCode;
-    private String bedNo;
-    private String zoneCode;
-    private LocalDateTime lastAssessedAt;
+    private String memo;
+    private String chiefComplaintRaw;
 }

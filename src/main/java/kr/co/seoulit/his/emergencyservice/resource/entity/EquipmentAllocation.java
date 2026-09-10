@@ -18,8 +18,8 @@ public class EquipmentAllocation {
     @Column(name = "EQUIPMENT_ALLOCATION_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "EQUIPMENT_ID", nullable = false)

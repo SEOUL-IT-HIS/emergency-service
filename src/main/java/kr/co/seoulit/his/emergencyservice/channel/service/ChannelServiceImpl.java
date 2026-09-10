@@ -26,7 +26,7 @@ public class ChannelServiceImpl implements ChannelService {
             throw new IllegalArgumentException("encounterId and specialty are required");
         }
         ConsultRequest entity = new ConsultRequest();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setTargetDeptCode(request.getSpecialty());
         entity.setReason(request.getReason());
         entity.setOrderId(request.getOrderId());
@@ -38,7 +38,7 @@ public class ChannelServiceImpl implements ChannelService {
 
         ConsultRequestDto dto = new ConsultRequestDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setTargetDeptCode(saved.getTargetDeptCode());
         dto.setConsultStatusCode(saved.getConsultStatusCode());
         dto.setReason(saved.getReason());
@@ -54,7 +54,7 @@ public class ChannelServiceImpl implements ChannelService {
             throw new IllegalArgumentException("encounterId and targetRole are required");
         }
         OncallRequest entity = new OncallRequest();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setTargetRoleCode(request.getTargetRole());
         entity.setCalledById(request.getCalledById());
         entity.setCalledAt(LocalDateTime.now());
@@ -64,7 +64,7 @@ public class ChannelServiceImpl implements ChannelService {
 
         OncallRequestDto dto = new OncallRequestDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setTargetRoleCode(saved.getTargetRoleCode());
         dto.setCalledById(saved.getCalledById());
         dto.setCalledAt(saved.getCalledAt());

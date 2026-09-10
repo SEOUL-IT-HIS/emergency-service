@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Setter
 public class RiskScreeningDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String screeningTypeCode;
     private BigDecimal score;
     private String resultCode;

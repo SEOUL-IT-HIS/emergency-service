@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,24 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<BedDto> getBeds(String zoneCode, String status) {
+        return bedRepository.findAll().stream()
+                .filter(bed -> !StringUtils.hasText(zoneCode) || zoneCode.equals(bed.getZoneCode()))
+                .filter(bed -> !StringUtils.hasText(status) || status.equals(bed.getBedStatusCode()))
+                .map(bed -> {
+                    BedDto dto = new BedDto();
+                    dto.setId(bed.getId());
+                    dto.setBedNo(bed.getBedNo());
+                    dto.setZoneCode(bed.getZoneCode());
+                    dto.setBedTypeCode(bed.getBedTypeCode());
+                    dto.setBedStatusCode(bed.getBedStatusCode());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public BedAssignmentDto assignBed(BedAssignmentCreateRequestDto request) {
         if (!StringUtils.hasText(request.getEncounterId()) || request.getBedId() == null) {
@@ -47,7 +67,7 @@ public class ResourceServiceImpl implements ResourceService {
             throw new ConflictException("bed already occupied: " + request.getBedId());
         }
         BedAssignment assignment = new BedAssignment();
-        assignment.setReceptionNo(request.getEncounterId());
+        assignment.setReceptionId(request.getEncounterId());
         assignment.setBed(bed);
         assignment.setAssignedById(request.getAssignedById());
         assignment.setAssignedAt(LocalDateTime.now());
@@ -60,12 +80,44 @@ public class ResourceServiceImpl implements ResourceService {
 
         BedAssignmentDto dto = new BedAssignmentDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setBedId(bed.getId());
         dto.setBedNo(bed.getBedNo());
         dto.setZoneCode(bed.getZoneCode());
         dto.setAssignedById(saved.getAssignedById());
         dto.setAssignedAt(saved.getAssignedAt());
+        return dto;
+    }
+
+    @Override
+    @Transactional
+    public BedAssignmentDto releaseBed(String assignmentId, BedReleaseRequestDto request) {
+        if (!StringUtils.hasText(request.getReleasedById())) {
+            throw new IllegalArgumentException("releasedById is required");
+        }
+        BedAssignment assignment = bedAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("bedAssignment", assignmentId));
+        if (assignment.getReleasedAt() != null) {
+            throw new ConflictException("bed assignment already released: " + assignmentId);
+        }
+        assignment.setReleasedById(request.getReleasedById());
+        assignment.setReleasedAt(LocalDateTime.now());
+        assignment.setUpdatedAt(LocalDateTime.now());
+
+        Bed bed = assignment.getBed();
+        bed.setBedStatusCode("EMPTY");
+        bed.setUpdatedAt(LocalDateTime.now());
+
+        BedAssignmentDto dto = new BedAssignmentDto();
+        dto.setId(assignment.getId());
+        dto.setReceptionId(assignment.getReceptionId());
+        dto.setBedId(bed.getId());
+        dto.setBedNo(bed.getBedNo());
+        dto.setZoneCode(bed.getZoneCode());
+        dto.setAssignedById(assignment.getAssignedById());
+        dto.setAssignedAt(assignment.getAssignedAt());
+        dto.setReleasedById(assignment.getReleasedById());
+        dto.setReleasedAt(assignment.getReleasedAt());
         return dto;
     }
 
@@ -81,7 +133,7 @@ public class ResourceServiceImpl implements ResourceService {
             throw new ConflictException("equipment already in use: " + request.getEquipmentId());
         }
         EquipmentAllocation allocation = new EquipmentAllocation();
-        allocation.setReceptionNo(request.getEncounterId());
+        allocation.setReceptionId(request.getEncounterId());
         allocation.setEquipment(equipment);
         allocation.setAllocatedById(request.getAllocatedById());
         allocation.setAllocatedAt(LocalDateTime.now());
@@ -94,7 +146,7 @@ public class ResourceServiceImpl implements ResourceService {
 
         EquipmentAllocationDto dto = new EquipmentAllocationDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setEquipmentId(equipment.getId());
         dto.setAssetNo(equipment.getAssetNo());
         dto.setAllocatedById(saved.getAllocatedById());

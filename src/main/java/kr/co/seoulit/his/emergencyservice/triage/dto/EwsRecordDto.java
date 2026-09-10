@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EwsRecordDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private Integer systolicBp;
     private Integer heartRate;
     private Integer respRate;

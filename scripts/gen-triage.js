@@ -43,8 +43,8 @@ public class EmsReferral {
     @Column(name = "EMS_REFERRAL_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "EMS_AGENCY_NAME", length = 100)
     private String emsAgencyName;
@@ -79,8 +79,8 @@ public class TriageAssessment {
     @Column(name = "TRIAGE_ASSESSMENT_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "KTAS_LEVEL_CODE", length = 10)
     private String ktasLevelCode;
@@ -119,8 +119,8 @@ public class EwsRecord {
     @Column(name = "EWS_RECORD_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "SYSTOLIC_BP")
     private Integer systolicBp;
@@ -170,8 +170,8 @@ public class IsolationAssessment {
     @Column(name = "ISOLATION_ASSESSMENT_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ISOLATION_TYPE_CODE", length = 20)
     private String isolationTypeCode;
@@ -210,8 +210,8 @@ public class RiskScreening {
     @Column(name = "RISK_SCREENING_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "SCREENING_TYPE_CODE", length = 20)
     private String screeningTypeCode;
@@ -239,7 +239,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ${name}Repository extends JpaRepository<${name}, Long> {
-    List<${name}> findByReceptionNo(String receptionNo);
+    List<${name}> findByReceptionId(String receptionId);
 }
 `);
 });
@@ -254,7 +254,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EmsReferralDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String emsAgencyName;
     private String vitalsOnScene;
     private String prehospitalTreatment;
@@ -303,7 +303,7 @@ import java.time.LocalDateTime;
 @Setter
 public class TriageAssessmentDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String ktasLevelCode;
     private String assessmentTypeCode;
     private String assessedById;
@@ -351,7 +351,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EwsRecordDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Integer systolicBp;
     private Integer heartRate;
     private Integer respRate;
@@ -390,7 +390,7 @@ import java.time.LocalDateTime;
 @Setter
 public class IsolationAssessmentDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String isolationTypeCode;
     private String requiredYn;
     private String decidedById;
@@ -427,7 +427,7 @@ import java.time.LocalDateTime;
 @Setter
 public class RiskScreeningDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String screeningTypeCode;
     private BigDecimal score;
     private String resultCode;
@@ -461,7 +461,7 @@ import ${PKG}.triage.dto.*;
 import java.util.List;
 
 public interface TriageService {
-    List<EmsReferralDto> getEmsInfo(String receptionNo);
+    List<EmsReferralDto> getEmsInfo(String receptionId);
     TriageAssessmentDto createKtas(KtasCreateRequestDto request);
     TriageAssessmentDto updateKtas(Long id, KtasUpdateRequestDto request);
     List<EwsRecordDto> createVitalAssessments(VitalAssessmentCreateRequestDto request);
@@ -498,9 +498,9 @@ public class TriageServiceImpl implements TriageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EmsReferralDto> getEmsInfo(String receptionNo) {
-        if (StringUtils.hasText(receptionNo)) {
-            return triageMapper.toEmsDtoList(emsReferralRepository.findByReceptionNo(receptionNo));
+    public List<EmsReferralDto> getEmsInfo(String receptionId) {
+        if (StringUtils.hasText(receptionId)) {
+            return triageMapper.toEmsDtoList(emsReferralRepository.findByReceptionId(receptionId));
         }
         return triageMapper.toEmsDtoList(emsReferralRepository.findAll());
     }
@@ -512,7 +512,7 @@ public class TriageServiceImpl implements TriageService {
             throw new IllegalArgumentException("encounterId and ktasScore are required");
         }
         TriageAssessment entity = new TriageAssessment();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setKtasLevelCode(request.getKtasScore());
         entity.setAssessmentTypeCode(
                 StringUtils.hasText(request.getAssessmentTypeCode()) ? request.getAssessmentTypeCode() : "INITIAL");
@@ -553,7 +553,7 @@ public class TriageServiceImpl implements TriageService {
         List<EwsRecord> saved = new ArrayList<>();
         for (VitalAssessmentCreateRequestDto.VitalItemDto vital : request.getVitals()) {
             EwsRecord entity = new EwsRecord();
-            entity.setReceptionNo(request.getEncounterId());
+            entity.setReceptionId(request.getEncounterId());
             entity.setSystolicBp(vital.getSystolicBp());
             entity.setHeartRate(vital.getHeartRate());
             entity.setRespRate(vital.getRespRate());
@@ -577,7 +577,7 @@ public class TriageServiceImpl implements TriageService {
             throw new IllegalArgumentException("patientId or encounterId is required");
         }
         IsolationAssessment entity = new IsolationAssessment();
-        entity.setReceptionNo(StringUtils.hasText(request.getEncounterId())
+        entity.setReceptionId(StringUtils.hasText(request.getEncounterId())
                 ? request.getEncounterId() : request.getPatientId());
         entity.setIsolationTypeCode(request.getIsolationTypeCode());
         entity.setRequiredYn(StringUtils.hasText(request.getRequiredYn()) ? request.getRequiredYn() : "Y");
@@ -595,7 +595,7 @@ public class TriageServiceImpl implements TriageService {
             throw new IllegalArgumentException("encounterId and screenType are required");
         }
         RiskScreening entity = new RiskScreening();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setScreeningTypeCode(request.getScreenType());
         entity.setScore(request.getScore());
         entity.setResultCode(request.getResultCode());
@@ -627,8 +627,8 @@ public class TriageController {
 
     @GetMapping("/ems-info")
     public ApiResponse<List<EmsReferralDto>> getEmsInfo(
-            @RequestParam(required = false) String receptionNo) {
-        return ApiResponse.success(triageService.getEmsInfo(receptionNo));
+            @RequestParam(required = false) String receptionId) {
+        return ApiResponse.success(triageService.getEmsInfo(receptionId));
     }
 
     @PostMapping("/ktas")

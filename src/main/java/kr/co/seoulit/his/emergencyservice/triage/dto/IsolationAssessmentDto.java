@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class IsolationAssessmentDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String isolationTypeCode;
     private String requiredYn;
     private String decidedById;

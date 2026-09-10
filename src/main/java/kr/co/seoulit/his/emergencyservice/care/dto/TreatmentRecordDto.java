@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class TreatmentRecordDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private Long orderId;
     private String treatmentTypeCode;
     private String description;

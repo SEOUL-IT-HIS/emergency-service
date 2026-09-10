@@ -8,10 +8,12 @@ import java.time.LocalDateTime;
 @Setter
 public class BedAssignmentDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String bedId;
     private String bedNo;
     private String zoneCode;
     private String assignedById;
     private LocalDateTime assignedAt;
+    private String releasedById;
+    private LocalDateTime releasedAt;
 }

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  *
  * CareServiceImpl.getPatients()는 RCP 호출 없이 TRIAGE_ASSESSMENT만 읽으므로,
  * 이 테이블에 최초 분류(INITIAL) 레코드가 있으면 목록에 바로 노출된다.
- * EmsReferralSeeder와 동일한 receptionNo(ER-20260716-001/002)를 재사용해 EMS 패널과
+ * EmsReferralSeeder와 동일한 receptionId(ER-20260716-001/002)를 재사용해 EMS 패널과
  * 환자가 일치하도록 맞췄고, 마지막 한 건은 EMS 이송 없이 내원한 케이스로 추가했다.
  * 애플리케이션 기동 시 테이블이 비어 있을 때만 채우는 멱등 시드다.
  */
@@ -35,9 +35,9 @@ public class TriageAssessmentSeeder implements CommandLineRunner {
         save("ER-20260716-003", "1", "호흡곤란, 보호자 동반 내원(EMS 미이송)", LocalDateTime.now().minusMinutes(5));
     }
 
-    private void save(String receptionNo, String ktasLevelCode, String reason, LocalDateTime assessedAt) {
+    private void save(String receptionId, String ktasLevelCode, String reason, LocalDateTime assessedAt) {
         TriageAssessment assessment = new TriageAssessment();
-        assessment.setReceptionNo(receptionNo);
+        assessment.setReceptionId(receptionId);
         assessment.setKtasLevelCode(ktasLevelCode);
         assessment.setAssessmentTypeCode("INITIAL");
         assessment.setAssessedById("E0001");

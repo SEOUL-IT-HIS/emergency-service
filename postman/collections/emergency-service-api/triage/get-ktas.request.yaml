@@ -3,5 +3,5 @@ method: GET
 url: '{{baseUrl}}/api/emergency/triage/ktas'
 order: 2000
 queryParams:
-  - key: receptionNo
+  - key: receptionId
     value: 'RCP-20260716-001'

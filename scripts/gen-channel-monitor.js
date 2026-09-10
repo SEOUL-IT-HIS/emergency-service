@@ -37,8 +37,8 @@ public class ConsultRequest {
     @Column(name = "CONSULT_REQUEST_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ORDER_ID")
     private Long orderId;
@@ -79,8 +79,8 @@ public class OncallRequest {
     @Column(name = "ONCALL_REQUEST_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ORDER_ID")
     private Long orderId;
@@ -118,8 +118,8 @@ public class SurgeryRequest {
     @Column(name = "SURGERY_REQUEST_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "ORDER_ID")
     private Long orderId;
@@ -173,7 +173,7 @@ import java.time.LocalDateTime;
 @Setter
 public class ConsultRequestDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String targetDeptCode;
     private String consultStatusCode;
     private String reason;
@@ -206,7 +206,7 @@ import java.time.LocalDateTime;
 @Setter
 public class OncallRequestDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private String targetRoleCode;
     private String calledById;
     private LocalDateTime calledAt;
@@ -251,7 +251,7 @@ public class ChannelServiceImpl implements ChannelService {
             throw new IllegalArgumentException("encounterId and specialty are required");
         }
         ConsultRequest entity = new ConsultRequest();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setTargetDeptCode(request.getSpecialty());
         entity.setReason(request.getReason());
         entity.setOrderId(request.getOrderId());
@@ -263,7 +263,7 @@ public class ChannelServiceImpl implements ChannelService {
 
         ConsultRequestDto dto = new ConsultRequestDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setTargetDeptCode(saved.getTargetDeptCode());
         dto.setConsultStatusCode(saved.getConsultStatusCode());
         dto.setReason(saved.getReason());
@@ -279,7 +279,7 @@ public class ChannelServiceImpl implements ChannelService {
             throw new IllegalArgumentException("encounterId and targetRole are required");
         }
         OncallRequest entity = new OncallRequest();
-        entity.setReceptionNo(request.getEncounterId());
+        entity.setReceptionId(request.getEncounterId());
         entity.setTargetRoleCode(request.getTargetRole());
         entity.setCalledById(request.getCalledById());
         entity.setCalledAt(LocalDateTime.now());
@@ -289,7 +289,7 @@ public class ChannelServiceImpl implements ChannelService {
 
         OncallRequestDto dto = new OncallRequestDto();
         dto.setId(saved.getId());
-        dto.setReceptionNo(saved.getReceptionNo());
+        dto.setReceptionId(saved.getReceptionId());
         dto.setTargetRoleCode(saved.getTargetRoleCode());
         dto.setCalledById(saved.getCalledById());
         dto.setCalledAt(saved.getCalledAt());
@@ -344,8 +344,8 @@ public class LosAlert {
     @Column(name = "LOS_ALERT_ID")
     private Long id;
 
-    @Column(name = "RECEPTION_NO", length = 20)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 20)
+    private String receptionId;
 
     @Column(name = "THRESHOLD_MINUTES")
     private Integer thresholdMinutes;
@@ -400,7 +400,7 @@ import java.time.LocalDateTime;
 @Setter
 public class LosAlertDto {
     private Long id;
-    private String receptionNo;
+    private String receptionId;
     private Integer thresholdMinutes;
     private LocalDateTime triggeredAt;
 }
@@ -464,7 +464,7 @@ public class MonitorServiceImpl implements MonitorService {
 
         DashboardDto dto = new DashboardDto();
         dto.setTotalPatients(triageAssessmentRepository.findAll().stream()
-                .map(a -> a.getReceptionNo()).distinct().count());
+                .map(a -> a.getReceptionId()).distinct().count());
         dto.setOccupiedBeds(congestion.getOccupiedBeds());
         dto.setEmptyBeds(congestion.getEmptyBeds());
         dto.setOpenLosAlerts(openAlerts.size());
@@ -499,7 +499,7 @@ public class MonitorServiceImpl implements MonitorService {
     private LosAlertDto toDto(LosAlert entity) {
         LosAlertDto dto = new LosAlertDto();
         dto.setId(entity.getId());
-        dto.setReceptionNo(entity.getReceptionNo());
+        dto.setReceptionId(entity.getReceptionId());
         dto.setThresholdMinutes(entity.getThresholdMinutes());
         dto.setTriggeredAt(entity.getTriggeredAt());
         return dto;

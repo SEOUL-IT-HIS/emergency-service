@@ -18,8 +18,8 @@ public class MedicationAdministration {
     @Column(name = "MEDICATION_ADMINISTRATION_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @Column(name = "ORDER_ID", nullable = false)
     private Long orderId;

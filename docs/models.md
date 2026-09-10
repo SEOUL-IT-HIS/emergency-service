@@ -6,7 +6,7 @@ DBMS: **Oracle** · 스키마: emergency-service 소유
 ## 1. 도메인 맵
 
 ```text
-┌─────────────┐   reception_no(논리참조)   ┌──────────────┐
+┌─────────────┐   reception_id(논리참조)   ┌──────────────┐
 │ Reception   │◄──────────────────────────│   EMG BC     │
 │ (RCP)       │                           │              │
 └─────────────┘                           │  Triage      │
@@ -21,7 +21,7 @@ DBMS: **Oracle** · 스키마: emergency-service 소유
 └─────────────┘
 ```
 
-> `reception_no`, `order_id`, `*_by_id` 는 **물리 FK가 아닌 서비스 간 논리적 참조**입니다.
+> `reception_id`, `order_id`, `*_by_id` 는 **물리 FK가 아닌 서비스 간 논리적 참조**입니다.
 
 ## 2. 엔티티 관계 개요
 
@@ -36,7 +36,7 @@ erDiagram
   EMG_CODE_GROUP ||--o{ EMG_CODE : contains
 ```
 
-모든 업무 행은 `reception_no`(또는 API의 encounterId)로 응급 방문에 묶입니다.
+모든 업무 행은 `reception_id`(또는 API의 encounterId)로 응급 방문에 묶입니다.
 
 ## 3. 테이블 상세
 
@@ -136,9 +136,9 @@ Unique: `(group, code_value)`
 | 컬럼 | `lower_snake_case` |
 | PK | `{table}_id` **VARCHAR2(36) UUID** (MSA 공통 통일) |
 | 내부 FK | `{참조테이블}_id` VARCHAR2(36) — 동일 스키마 내 PK 참조 |
-| 타 서비스 논리 참조 | 상대 SoT 타입 따름 (`reception_no`, GR2 `order_id` 등) |
+| 타 서비스 논리 참조 | 상대 SoT 타입 따름 (`reception_id`, GR2 `order_id` 등) |
 | 업무번호(순수) | `*_no` VARCHAR2(20) — 타 서비스 PK 참조가 아닌 경우만 |
-| `reception_no` | **VARCHAR2(36)** — RCP `RECEPTION_ID`(PK)를 참조하는 논리 FK. PK/FK VARCHAR2(36) 통일 합의에 따름(2026-08-26). 위 "업무번호" 규칙 예외 |
+| `reception_id` | **VARCHAR2(36)** — RCP `RECEPTION_ID`(PK)를 참조하는 논리 FK. 이전에는 `reception_no`로 불렀으나, RCP 실제 PK 컬럼명과 일치시켜 혼동을 없애기 위해 `reception_id`로 통일(2026-09-03). PK/FK VARCHAR2(36) 통일 합의(2026-08-26)는 그대로 유지 |
 | 코드 | `*_code` / `*_cd` |
 | 여부 | `*_yn` CHAR(1) |
 | 일시 | `*_at` TIMESTAMP |

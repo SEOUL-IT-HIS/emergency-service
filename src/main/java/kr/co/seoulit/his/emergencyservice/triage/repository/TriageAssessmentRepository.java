@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface TriageAssessmentRepository extends JpaRepository<TriageAssessment, String> {
-    List<TriageAssessment> findByReceptionNo(String receptionNo);
-    List<TriageAssessment> findByReceptionNoOrderByAssessedAtAsc(String receptionNo);
-    boolean existsByReceptionNoAndAssessmentTypeCode(String receptionNo, String assessmentTypeCode);
+    List<TriageAssessment> findByReceptionId(String receptionId);
+    List<TriageAssessment> findByReceptionIdOrderByAssessedAtAsc(String receptionId);
+    boolean existsByReceptionIdAndAssessmentTypeCode(String receptionId, String assessmentTypeCode);
 }

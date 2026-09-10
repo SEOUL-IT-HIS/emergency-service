@@ -49,4 +49,10 @@ public class CareController {
     public ApiResponse<CprEventDto> createCprTimeline(@RequestBody CprTimelineCreateRequestDto request) {
         return ApiResponse.success(careService.createCprTimeline(request));
     }
+
+    @Operation(summary = "응급접수 정보 수신", description = "UC-CARE-01 보조 · RCP가 응급 접수 발생 시 호출(연계:RCP). 재전송 시 upsert")
+    @PostMapping("/reception-intakes")
+    public ApiResponse<ReceptionIntakeDto> createReceptionIntake(@RequestBody ReceptionIntakeCreateRequestDto request) {
+        return ApiResponse.success(careService.createReceptionIntake(request));
+    }
 }

@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 public class EmsReferralDto {
     private String id;
-    private String receptionNo;
+    private String receptionId;
     private String emsAgencyName;
     private String vitalsOnScene;
     private String prehospitalTreatment;

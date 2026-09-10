@@ -18,8 +18,8 @@ public class TreatmentRecord {
     @Column(name = "TREATMENT_RECORD_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @Column(name = "ORDER_ID")
     private Long orderId;

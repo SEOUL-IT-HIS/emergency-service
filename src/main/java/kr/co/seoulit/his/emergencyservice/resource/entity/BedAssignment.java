@@ -18,8 +18,8 @@ public class BedAssignment {
     @Column(name = "BED_ASSIGNMENT_ID", length = 36)
     private String id;
 
-    @Column(name = "RECEPTION_NO", length = 36)
-    private String receptionNo;
+    @Column(name = "RECEPTION_ID", length = 36)
+    private String receptionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "BED_ID", nullable = false)
@@ -30,6 +30,9 @@ public class BedAssignment {
 
     @Column(name = "ASSIGNED_AT")
     private LocalDateTime assignedAt;
+
+    @Column(name = "RELEASED_BY_ID", length = 36)
+    private String releasedById;
 
     @Column(name = "RELEASED_AT")
     private LocalDateTime releasedAt;

@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface RiskScreeningRepository extends JpaRepository<RiskScreening, String> {
-    List<RiskScreening> findByReceptionNo(String receptionNo);
+    List<RiskScreening> findByReceptionId(String receptionId);
 }
