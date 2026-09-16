@@ -12,4 +12,5 @@ public class ClinicalNoteDto {
     private String content;
     private String recordedById;
     private LocalDateTime recordedAt;
+    private LocalDateTime signedAt;
 }

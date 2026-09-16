@@ -29,6 +29,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // 로그인 세션을 톰캣 메모리 대신 Redis 에 저장
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.session:spring-session-data-redis'
 
     runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
     runtimeOnly 'com.h2database:h2'

@@ -3,7 +3,7 @@
 근거: `응급관리_API_목록(응급전용제외).xlsx` (2026-07-16), `전체서비스_API카탈로그.xlsx`  
 Base path (EMG Provider): `/api/emergency`  
 공통 응답: `{ "code", "message", "data" }`  
-Swagger UI: `http://localhost:8085/swagger-ui.html` (코드 기반 자동 생성 명세 — 상세 스키마는 Swagger 참조)
+Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성 명세 — 상세 스키마는 Swagger 참조)
 
 ---
 
@@ -112,10 +112,10 @@ Swagger UI: `http://localhost:8085/swagger-ui.html` (코드 기반 자동 생성
 
 | Provider | Method | URL | 용도 |
 | --- | --- | --- | --- |
-| PAT | GET | `/api/v1/patients/{patientId}` | 환자 상세 |
-| PAT | POST | `/api/v1/patients/batch-query` | 목록 N+1 방지 |
-| PAT | GET | `/api/v1/patients/{patientId}/safety-info` | 알레르기 SoT |
-| PAT | GET | `/api/v1/patients/{patientId}/guardians/*` | 보호자 |
+| PAT | GET | `/api/patients/{patientId}` | 환자 상세 |
+| PAT | POST | `/api/patients/batch-query` | 목록 N+1 방지 |
+| PAT | GET | `/api/patients/{patientId}/safety-info` | 알레르기 SoT |
+| PAT | GET | `/api/patients/{patientId}/guardians/*` | 보호자 |
 | ADM | GET | `/api/admin/commonCodes/groups/{groupCode}` | KTAS 등 공유코드 |
 | ADM | GET | `/api/admin/medicalDepts` | 진료과 |
 | ADM | GET | `/api/staff/employees/{employeeId}` | 직원 |

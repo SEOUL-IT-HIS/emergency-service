@@ -4,12 +4,14 @@
 # ============================================================
 
 server:
-  port: 8085
+  port: 8089
   servlet:
     session:
+      timeout: 10h
       cookie:
-        same-site: none
-        secure: true
+        http-only: true
+        path: /
+        same-site: lax
 
 app:
   api:
@@ -22,13 +24,22 @@ app:
       - http://127.0.0.1:3000
   admin:
     # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
-    base-url: http://192.168.1.128:8080
+    base-url: ${ADMIN_BASE_URL:http://192.168.1.128:8080}
+  patient:
+    base-url: ${PATIENT_BASE_URL:http://192.168.1.149:8087}
+  kafka:
+    enabled: false
 
 spring:
   application:
     name: emergency-service
   config:
     import: optional:classpath:application-local.yml
+  data:
+    redis:
+      host: 192.168.1.126
+      port: 6379
+      password: ${REDIS_PASSWORD:}
   datasource:
     url: jdbc:oracle:thin:@//seoulit.pe.kr:1521/FREEPDB1
     username: emergency
@@ -42,6 +53,17 @@ spring:
       hibernate:
         format_sql: true
         default_schema: EMERGENCY
+  kafka:
+    bootstrap-servers: 192.168.1.126:9092
+    consumer:
+      group-id: emergency-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: kr.co.seoulit.his.emergencyservice.care.messaging.dto
+        spring.json.value.default.type: kr.co.seoulit.his.emergencyservice.care.messaging.dto.ReceptionIntakeEvent
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

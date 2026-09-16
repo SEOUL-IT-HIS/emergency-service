@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ClinicalNoteRepository extends JpaRepository<ClinicalNote, String> {
     List<ClinicalNote> findByReceptionId(String receptionId);
+    List<ClinicalNote> findByReceptionIdOrderByRecordedAtAsc(String receptionId);
 }

@@ -2,4 +2,4 @@ $kind: collection
 name: 'Emergency Service API'
 variables:
   - key: baseUrl
-    value: 'http://localhost:8085'
+    value: 'http://localhost:8089'
