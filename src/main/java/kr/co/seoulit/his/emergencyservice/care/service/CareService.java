@@ -5,6 +5,7 @@ import java.util.List;
 
 public interface CareService {
     List<EmergencyPatientDto> getPatients(String date, String status);
+    List<ClinicalNoteDto> getRecords(String receptionId);
     ClinicalNoteDto createRecord(ClinicalNoteCreateRequestDto request);
     TreatmentRecordDto createTreatment(TreatmentCreateRequestDto request);
     MarDto createMar(MarCreateRequestDto request);

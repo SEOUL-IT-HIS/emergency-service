@@ -4,11 +4,16 @@ import kr.co.seoulit.his.emergencyservice.care.dto.*;
 import kr.co.seoulit.his.emergencyservice.care.entity.*;
 import kr.co.seoulit.his.emergencyservice.care.mapper.CareMapstructMapper;
 import kr.co.seoulit.his.emergencyservice.care.repository.*;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
+import kr.co.seoulit.his.emergencyservice.patient.client.PatientClient;
+import kr.co.seoulit.his.emergencyservice.patient.dto.PatientDto;
 import kr.co.seoulit.his.emergencyservice.resource.entity.BedAssignment;
 import kr.co.seoulit.his.emergencyservice.resource.repository.BedAssignmentRepository;
 import kr.co.seoulit.his.emergencyservice.triage.entity.TriageAssessment;
 import kr.co.seoulit.his.emergencyservice.triage.repository.TriageAssessmentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,13 +23,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CareServiceImpl implements CareService {
 
-    // TODO: ARRIVAL_PATH가 admin 공통코드로 이관되면(개발표준가이드 21.4) CommonCodeCache 조회로 교체
-    private static final Set<String> VALID_ARRIVAL_PATHS =
-            Set.of("EMS_119", "WALK_IN", "TRANSFER_IN", "SELF_TRANSPORT");
+    // RCP의 실제 공통코드 그룹(admin Common Codes 화면 "내원형태코드"). admin 캐시가 비어있을 때만
+    // 아래 폴백값을 쓴다 - 2026-09-10 기준 실제 값(01 예약/02 당일방문/03 응급내원/04 전원환자).
+    private static final String ARRIVAL_PATH_GROUP_CODE = "VISIT_FORM_CD";
+    private static final Set<String> ARRIVAL_PATH_FALLBACK = Set.of("01", "02", "03", "04");
 
     private final ClinicalNoteRepository clinicalNoteRepository;
     private final TreatmentRecordRepository treatmentRecordRepository;
@@ -33,66 +40,84 @@ public class CareServiceImpl implements CareService {
     private final TriageAssessmentRepository triageAssessmentRepository;
     private final BedAssignmentRepository bedAssignmentRepository;
     private final ReceptionIntakeRepository receptionIntakeRepository;
+    private final CommonCodeCache commonCodeCache;
     private final CareMapstructMapper careMapper;
+    private final PatientClient patientClient;
 
     @Override
     @Transactional(readOnly = true)
     public List<EmergencyPatientDto> getPatients(String date, String status) {
-        List<TriageAssessment> assessments = triageAssessmentRepository.findAll();
-        Map<String, TriageAssessment> latestByReception = new LinkedHashMap<>();
-        for (TriageAssessment assessment : assessments) {
-            if (!StringUtils.hasText(assessment.getReceptionId())) {
-                continue;
-            }
-            if (StringUtils.hasText(date)) {
-                LocalDate filterDate = LocalDate.parse(date);
-                if (assessment.getAssessedAt() == null
-                        || !assessment.getAssessedAt().toLocalDate().equals(filterDate)) {
-                    continue;
-                }
-            }
-            TriageAssessment existing = latestByReception.get(assessment.getReceptionId());
-            if (existing == null
-                    || (assessment.getAssessedAt() != null
-                    && (existing.getAssessedAt() == null
-                    || assessment.getAssessedAt().isAfter(existing.getAssessedAt())))) {
-                latestByReception.put(assessment.getReceptionId(), assessment);
-            }
-        }
+        // 순회 기준 = ReceptionIntake(접수). 접수만 되어있으면 KTAS 전이라도 목록에 뜬다.
+        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
 
-        return latestByReception.values().stream().map(assessment -> {
-            EmergencyPatientDto dto = new EmergencyPatientDto();
-            dto.setReceptionId(assessment.getReceptionId());
-            ReceptionIntake intake = receptionIntakeRepository.findById(assessment.getReceptionId()).orElse(null);
-            if (intake != null) {
-                dto.setPatientName(intake.getPatientName());
-                dto.setReceivedAt(intake.getReceivedAt());
-            } else {
-                // TODO RCP 연동 전(또는 미수신 건) 임시값. RCP가 reception-intakes를 호출하면 위 분기로 채워짐.
-                dto.setPatientName(mockPatientName(assessment.getReceptionId()));
-            }
-            dto.setKtasLevelCode(assessment.getKtasLevelCode());
-            dto.setLastAssessedAt(assessment.getAssessedAt());
-            dto.setCareStatusCode("IN_CARE");
-            List<BedAssignment> beds =
-                    bedAssignmentRepository.findByReceptionIdAndReleasedAtIsNull(assessment.getReceptionId());
-            if (!beds.isEmpty() && beds.get(0).getBed() != null) {
-                dto.setBedNo(beds.get(0).getBed().getBedNo());
-                dto.setZoneCode(beds.get(0).getBed().getZoneCode());
-            }
-            return dto;
-        }).filter(dto -> !StringUtils.hasText(status) || status.equals(dto.getCareStatusCode()))
+        // 환자명은 더 이상 접수 데이터에 저장하지 않고, PAT 배치조회로 채운다.
+        // N번 개별 호출하지 않도록 patientId를 모아서 한 번만 호출한다.
+        // PAT은 UUID 형식이 아닌 값이 하나라도 섞이면 요청 전체를 400으로 거부하므로,
+        // 형식이 잘못된 값은 호출 전에 걸러내야 나머지 정상 건까지 같이 실패하지 않는다.
+        List<String> patientIds = intakes.stream()
+                .map(ReceptionIntake::getPatientId)
+                .filter(StringUtils::hasText)
+                .filter(this::isValidPatientId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<String, String> patientNames = patientClient.getPatients(patientIds).stream()
+                .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName));
+
+        return intakes.stream()
+                .filter(intake -> {
+                    if (!StringUtils.hasText(date)) {
+                        return true;
+                    }
+                    LocalDate filterDate = LocalDate.parse(date);
+                    return intake.getReceivedAt() != null
+                            && intake.getReceivedAt().toLocalDate().equals(filterDate);
+                })
+                .map(intake -> {
+                    EmergencyPatientDto dto = new EmergencyPatientDto();
+                    dto.setReceptionId(intake.getId());
+                    dto.setPatientName(patientNames.get(intake.getPatientId()));
+                    dto.setReceivedAt(intake.getReceivedAt());
+                    dto.setCareStatusCode("IN_CARE");
+
+                    List<TriageAssessment> history =
+                            triageAssessmentRepository.findByReceptionIdOrderByAssessedAtAsc(intake.getId());
+                    if (!history.isEmpty()) {
+                        TriageAssessment latest = history.get(history.size() - 1);
+                        dto.setKtasLevelCode(latest.getKtasLevelCode());
+                        dto.setLastAssessedAt(latest.getAssessedAt());
+                    }
+
+                    List<BedAssignment> beds =
+                            bedAssignmentRepository.findByReceptionIdAndReleasedAtIsNull(intake.getId());
+                    if (!beds.isEmpty() && beds.get(0).getBed() != null) {
+                        dto.setBedNo(beds.get(0).getBed().getBedNo());
+                        dto.setZoneCode(beds.get(0).getBed().getZoneCode());
+                    }
+                    return dto;
+                })
+                .filter(dto -> !StringUtils.hasText(status) || status.equals(dto.getCareStatusCode()))
                 .collect(Collectors.toList());
     }
 
-    private static final Map<String, String> MOCK_PATIENT_NAMES = Map.of(
-            "ER-20260716-001", "홍길동",
-            "ER-20260716-002", "김영희",
-            "ER-20260716-003", "이철수"
-    );
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClinicalNoteDto> getRecords(String receptionId){
+        if (!StringUtils.hasText(receptionId)){
+            throw new IllegalArgumentException("receptionId is required");
+        }
 
-    private String mockPatientName(String receptionId) {
-        return MOCK_PATIENT_NAMES.getOrDefault(receptionId, "환자(" + receptionId + ")");
+        List<ClinicalNote> notes = clinicalNoteRepository.findByReceptionIdOrderByRecordedAtAsc(receptionId);
+        return notes.stream().map( note -> {
+            ClinicalNoteDto dto = new ClinicalNoteDto();
+            dto.setId(note.getId());
+            dto.setReceptionId(note.getReceptionId());
+            dto.setContent(note.getContent());
+            dto.setRecordedById(note.getRecordedById());
+            dto.setRecordedAt(note.getRecordedAt());
+            dto.setSignedAt(note.getSignedAt());
+            return dto;
+                }).collect(Collectors.toList());
     }
 
     @Override
@@ -211,15 +236,15 @@ public class CareServiceImpl implements CareService {
     public ReceptionIntakeDto createReceptionIntake(ReceptionIntakeCreateRequestDto request) {
         if (!StringUtils.hasText(request.getReceptionId())
                 || !StringUtils.hasText(request.getPatientId())
-                || !StringUtils.hasText(request.getPatientName())
                 || !StringUtils.hasText(request.getArrivalPath())
                 || request.getReceivedAt() == null) {
             throw new IllegalArgumentException(
-                    "receptionId, patientId, patientName, arrivalPath, receivedAt are required");
+                    "receptionId, patientId, arrivalPath, receivedAt are required");
         }
-        if (!VALID_ARRIVAL_PATHS.contains(request.getArrivalPath())) {
+        Set<String> validArrivalPaths = validArrivalPaths();
+        if (!validArrivalPaths.contains(request.getArrivalPath())) {
             throw new IllegalArgumentException(
-                    "arrivalPath must be one of EMS_119, WALK_IN, TRANSFER_IN, SELF_TRANSPORT");
+                    "arrivalPath must be one of " + String.join(", ", validArrivalPaths));
         }
 
         ReceptionIntake intake = receptionIntakeRepository.findById(request.getReceptionId())
@@ -228,8 +253,7 @@ public class CareServiceImpl implements CareService {
 
         intake.setId(request.getReceptionId());
         intake.setPatientId(request.getPatientId());
-        intake.setPatientName(request.getPatientName());
-        intake.setArrivalPath(request.getArrivalPath());
+        intake.setArrivalPathCode(request.getArrivalPath());
         intake.setReceivedAt(request.getReceivedAt());
         intake.setMemo(request.getMemo());
         intake.setChiefComplaintRaw(request.getChiefComplaintRaw());
@@ -243,11 +267,37 @@ public class CareServiceImpl implements CareService {
         ReceptionIntakeDto dto = new ReceptionIntakeDto();
         dto.setReceptionId(saved.getId());
         dto.setPatientId(saved.getPatientId());
-        dto.setPatientName(saved.getPatientName());
-        dto.setArrivalPath(saved.getArrivalPath());
+        dto.setArrivalPath(saved.getArrivalPathCode());
         dto.setReceivedAt(saved.getReceivedAt());
         dto.setMemo(saved.getMemo());
         dto.setChiefComplaintRaw(saved.getChiefComplaintRaw());
         return dto;
+    }
+
+    /**
+     * admin 공통코드 "내원형태코드"(VISIT_FORM_CD)를 조회한다. 서버 기동 시 admin이 안 떠있었거나
+     * 아직 캐싱이 안 됐으면 빈 리스트가 오는데, 그럴 때 전부 막아버리면 RCP 연동이 통째로 끊기므로
+     * 마지막으로 확인된 실제 값(ARRIVAL_PATH_FALLBACK)으로 대신 검증한다.
+     */
+    /** PAT 배치조회는 UUID 형식이 아닌 값이 하나라도 있으면 요청 전체를 400으로 거부한다. */
+    private boolean isValidPatientId(String patientId) {
+        try {
+            UUID.fromString(patientId);
+            return true;
+        } catch (IllegalArgumentException e) {
+            log.warn("PAT 배치조회 대상에서 제외 - patientId가 UUID 형식이 아님: {}", patientId);
+            return false;
+        }
+    }
+
+    private Set<String> validArrivalPaths() {
+        List<AdminCommonCodeItemDto> codes = commonCodeCache.get(ARRIVAL_PATH_GROUP_CODE);
+        if (codes.isEmpty()) {
+            return ARRIVAL_PATH_FALLBACK;
+        }
+        return codes.stream()
+                .filter(code -> !"N".equals(code.getUseYn()))
+                .map(AdminCommonCodeItemDto::getCodeValue)
+                .collect(Collectors.toSet());
     }
 }

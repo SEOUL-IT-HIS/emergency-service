@@ -26,6 +26,12 @@ public class CareController {
         return ApiResponse.success(careService.getPatients(date, status));
     }
 
+    @Operation(summary = "응급 진료기록 목록 조회", description = "UC-CARE-02 · 특정 접수건의 EMR 임상노트 전체 조회")
+    @GetMapping("/records")
+    public ApiResponse<List<ClinicalNoteDto>> getRecords(@RequestParam String receptionId){
+        return ApiResponse.success(careService.getRecords(receptionId));
+    }
+
     @Operation(summary = "응급 진료기록 입력", description = "UC-CARE-02 · EMR 임상노트")
     @PostMapping("/records")
     public ApiResponse<ClinicalNoteDto> createRecord(@RequestBody ClinicalNoteCreateRequestDto request) {
