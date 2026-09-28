@@ -76,8 +76,8 @@ public class TreatmentRecord {
     @Column(name = "RECEPTION_ID", length = 20)
     private String receptionId;
 
-    @Column(name = "ORDER_ID")
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36)
+    private String orderId;
 
     @Column(name = "TREATMENT_TYPE_CODE", length = 20)
     private String treatmentTypeCode;
@@ -115,11 +115,11 @@ public class MedicationAdministration {
     @Column(name = "RECEPTION_ID", length = 20)
     private String receptionId;
 
-    @Column(name = "ORDER_ID", nullable = false)
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36, nullable = false)
+    private String orderId;
 
-    @Column(name = "ORDER_ITEM_ID")
-    private Long orderItemId;
+    @Column(name = "ORDER_ITEM_ID", length = 36)
+    private String orderItemId;
 
     @Column(name = "DRUG_CODE", length = 20)
     private String drugCode;
@@ -285,7 +285,7 @@ import lombok.Setter;
 @Setter
 public class TreatmentCreateRequestDto {
     private String encounterId;
-    private Long orderId;
+    private String orderId;
     private String treatmentCode;
     private String description;
     private String performedById;
@@ -303,7 +303,7 @@ import java.time.LocalDateTime;
 public class TreatmentRecordDto {
     private Long id;
     private String receptionId;
-    private Long orderId;
+    private String orderId;
     private String treatmentTypeCode;
     private String description;
     private String performedById;
@@ -321,8 +321,8 @@ import java.time.LocalDateTime;
 @Setter
 public class MarCreateRequestDto {
     private String encounterId;
-    private Long orderId;
-    private Long orderItemId;
+    private String orderId;
+    private String orderItemId;
     private String drugCode;
     private String dose;
     private String routeCode;
@@ -342,8 +342,8 @@ import java.time.LocalDateTime;
 public class MarDto {
     private Long id;
     private String receptionId;
-    private Long orderId;
-    private Long orderItemId;
+    private String orderId;
+    private String orderItemId;
     private String drugCode;
     private String dose;
     private String routeCode;
@@ -549,7 +549,7 @@ public class CareServiceImpl implements CareService {
     @Override
     @Transactional
     public MarDto createMar(MarCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || request.getOrderId() == null
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getOrderId())
                 || request.getAdministeredAt() == null || !StringUtils.hasText(request.getDose())) {
             throw new IllegalArgumentException("encounterId, orderId, administeredAt, dose are required");
         }

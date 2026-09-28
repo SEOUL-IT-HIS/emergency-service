@@ -21,8 +21,8 @@ public class ConsultRequest {
     @Column(name = "RECEPTION_ID", length = 36)
     private String receptionId;
 
-    @Column(name = "ORDER_ID")
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36)
+    private String orderId;
 
     @Column(name = "TARGET_DEPT_CODE", length = 20)
     private String targetDeptCode;

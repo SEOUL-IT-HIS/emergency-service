@@ -12,6 +12,6 @@ public class ConsultRequestDto {
     private String targetDeptCode;
     private String consultStatusCode;
     private String reason;
-    private Long orderId;
+    private String orderId;
     private LocalDateTime requestedAt;
 }

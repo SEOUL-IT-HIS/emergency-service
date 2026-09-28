@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class ClinicalNoteDto {
     private String id;
     private String receptionId;
+    private String noteTypeCode;
     private String content;
     private String recordedById;
     private LocalDateTime recordedAt;

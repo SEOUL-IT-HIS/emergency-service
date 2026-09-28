@@ -215,8 +215,8 @@ POST /api/emergency/care/medication-administrations
 
 {
   "encounterId": "ER-20260716-001",
-  "orderId": 55001,
-  "orderItemId": 5500101,
+  "orderId": "3f2b8c1e-7a4d-4e5b-9c61-2d8f0a1b5e77",
+  "orderItemId": "9a6e41d0-5c2b-4b8f-8e3a-71c0d4f2a955",
   "drugCode": "A12BC",
   "dose": "1g",
   "routeCode": "IV",

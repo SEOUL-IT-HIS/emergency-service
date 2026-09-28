@@ -33,6 +33,10 @@ public class CareServiceImpl implements CareService {
     private static final String ARRIVAL_PATH_GROUP_CODE = "VISIT_FORM_CD";
     private static final Set<String> ARRIVAL_PATH_FALLBACK = Set.of("01", "02", "03", "04");
 
+    // 진료기록 노트 종류 — 초진/재평가/처치/컨설트회신/퇴실요약. EMG 내부 전용 분류라 admin 공통코드로 안 뺌.
+    private static final Set<String> VALID_NOTE_TYPES =
+            Set.of("INITIAL", "REASSESSMENT", "PROCEDURE", "CONSULT_REPLY", "DISCHARGE_SUMMARY");
+
     private final ClinicalNoteRepository clinicalNoteRepository;
     private final TreatmentRecordRepository treatmentRecordRepository;
     private final MedicationAdministrationRepository medicationAdministrationRepository;
@@ -112,6 +116,7 @@ public class CareServiceImpl implements CareService {
             ClinicalNoteDto dto = new ClinicalNoteDto();
             dto.setId(note.getId());
             dto.setReceptionId(note.getReceptionId());
+            dto.setNoteTypeCode(note.getNoteTypeCode());
             dto.setContent(note.getContent());
             dto.setRecordedById(note.getRecordedById());
             dto.setRecordedAt(note.getRecordedAt());
@@ -124,11 +129,17 @@ public class CareServiceImpl implements CareService {
     @Transactional
     public ClinicalNoteDto createRecord(ClinicalNoteCreateRequestDto request) {
         if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getContent())
-                || !StringUtils.hasText(request.getRecordedById())) {
-            throw new IllegalArgumentException("encounterId, content, recordedById are required");
+                || !StringUtils.hasText(request.getRecordedById())
+                || !StringUtils.hasText(request.getNoteTypeCode())) {
+            throw new IllegalArgumentException("encounterId, noteTypeCode, content, recordedById are required");
+        }
+        if (!VALID_NOTE_TYPES.contains(request.getNoteTypeCode())) {
+            throw new IllegalArgumentException(
+                    "noteTypeCode must be one of " + String.join(", ", VALID_NOTE_TYPES));
         }
         ClinicalNote entity = new ClinicalNote();
         entity.setReceptionId(request.getEncounterId());
+        entity.setNoteTypeCode(request.getNoteTypeCode());
         entity.setContent(request.getContent());
         entity.setRecordedById(request.getRecordedById());
         entity.setRecordedAt(LocalDateTime.now());
@@ -141,7 +152,7 @@ public class CareServiceImpl implements CareService {
     @Transactional
     public TreatmentRecordDto createTreatment(TreatmentCreateRequestDto request) {
         // orderId 필수 검증: CLAUDE.md 12장 "투여/처치 기록(UC-CARE-03/04)에는 orderId 필수 검증 포함" 규정
-        if (!StringUtils.hasText(request.getEncounterId()) || request.getOrderId() == null
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getOrderId())
                 || !StringUtils.hasText(request.getTreatmentCode())
                 || !StringUtils.hasText(request.getPerformedById())) {
             throw new IllegalArgumentException(
@@ -162,7 +173,7 @@ public class CareServiceImpl implements CareService {
     @Override
     @Transactional
     public MarDto createMar(MarCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || request.getOrderId() == null
+        if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getOrderId())
                 || request.getAdministeredAt() == null || !StringUtils.hasText(request.getDose())
                 || !StringUtils.hasText(request.getDrugCode()) || !StringUtils.hasText(request.getRouteCode())
                 || !StringUtils.hasText(request.getAdministeredById())) {

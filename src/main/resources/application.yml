@@ -22,11 +22,14 @@ app:
     allowed-origin-patterns:
       - http://localhost:3000
       - http://127.0.0.1:3000
+      - http://117.16.154.233:18080
+      - http://localhost:18080
   admin:
-    # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
-    base-url: ${ADMIN_BASE_URL:http://192.168.1.128:8080}
+    # admin-service 공통코드 API base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.128:8080
+    base-url: ${ADMIN_BASE_URL:http://localhost:9191}
   patient:
-    base-url: ${PATIENT_BASE_URL:http://192.168.1.149:8087}
+    # patient-service 배치조회 base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.149:8087
+    base-url: ${PATIENT_BASE_URL:http://localhost:8087}
   kafka:
     enabled: false
 
@@ -37,7 +40,8 @@ spring:
     import: optional:classpath:application-local.yml
   data:
     redis:
-      host: 192.168.1.126
+      # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126
+      host: localhost
       port: 6379
       password: ${REDIS_PASSWORD:}
   datasource:
@@ -54,7 +58,8 @@ spring:
         format_sql: true
         default_schema: EMERGENCY
   kafka:
-    bootstrap-servers: 192.168.1.126:9092
+    # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126:9092
+    bootstrap-servers: localhost:9092
     consumer:
       group-id: emergency-service
       auto-offset-reset: earliest

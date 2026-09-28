@@ -38,9 +38,13 @@ public class PatientClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // 요청 바디 구성.  patientBatchRequestDto 안에  환자 ID 리스트를 담아서 보냄
+        // HttpEntity는 헤더+바디를 함께 담는 객체
         HttpEntity<PatientBatchRequestDto> request =
                 new HttpEntity<>(new PatientBatchRequestDto(patientIds), headers);
 
+        // 외부 API 호출.
         ResponseEntity<PatientApiResponse<List<PatientDto>>> response = restTemplate.exchange(
                 patientBaseUrl + "/api/patient/batch",
                 HttpMethod.POST,
@@ -48,6 +52,7 @@ public class PatientClient {
                 new ParameterizedTypeReference<>() {
                 });
 
+        // 응답처리.   응답이 null일 수 있으므로 안전하게 처리.  body.getData()가 실제 환자리스트,  없으면 빈 리스트 반환
         PatientApiResponse<List<PatientDto>> body = response.getBody();
         return body != null && body.getData() != null ? body.getData() : List.of();
     }

@@ -57,3 +57,10 @@ tasks.named('test') {
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += ['-Amapstruct.defaultComponentModel=spring']
 }
+
+// application-local.yml은 개인 PC 전용 오버라이드(admin/patient/kafka/redis 개인 주소)라
+// 배포용 jar(공용서버용)에는 포함되면 안 된다. IntelliJ/gradlew bootRun은 build/resources/main을
+// 직접 읽어서 실행하므로 이 제외와 무관하게 로컬 개발에서는 계속 정상 적용된다.
+tasks.named('bootJar') {
+    exclude 'application-local.yml'
+}

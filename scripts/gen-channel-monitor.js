@@ -40,8 +40,8 @@ public class ConsultRequest {
     @Column(name = "RECEPTION_ID", length = 20)
     private String receptionId;
 
-    @Column(name = "ORDER_ID")
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36)
+    private String orderId;
 
     @Column(name = "TARGET_DEPT_CODE", length = 20)
     private String targetDeptCode;
@@ -82,8 +82,8 @@ public class OncallRequest {
     @Column(name = "RECEPTION_ID", length = 20)
     private String receptionId;
 
-    @Column(name = "ORDER_ID")
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36)
+    private String orderId;
 
     @Column(name = "TARGET_ROLE_CODE", length = 20)
     private String targetRoleCode;
@@ -121,8 +121,8 @@ public class SurgeryRequest {
     @Column(name = "RECEPTION_ID", length = 20)
     private String receptionId;
 
-    @Column(name = "ORDER_ID")
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36)
+    private String orderId;
 
     @Column(name = "PROCEDURE_CODE", length = 30)
     private String procedureCode;
@@ -158,7 +158,7 @@ public class ConsultCreateRequestDto {
     private String encounterId;
     private String specialty;
     private String reason;
-    private Long orderId;
+    private String orderId;
     private String channelRef;
 }
 `);
@@ -177,7 +177,7 @@ public class ConsultRequestDto {
     private String targetDeptCode;
     private String consultStatusCode;
     private String reason;
-    private Long orderId;
+    private String orderId;
     private LocalDateTime requestedAt;
 }
 `);
@@ -485,7 +485,7 @@ public class MonitorServiceImpl implements MonitorService {
     @Override
     @Transactional(readOnly = true)
     public List<ExternalHospitalDto> getExternalHospitals() {
-        // NEDIS ?�동 ??stub ???��? 규격 ?�정 ??교체
+        // NEDIS ?�동 ??stub ???��? 규격 ?�정 ??교체
         List<ExternalHospitalDto> list = new ArrayList<>();
         ExternalHospitalDto sample = new ExternalHospitalDto();
         sample.setHospitalCode("11100000");

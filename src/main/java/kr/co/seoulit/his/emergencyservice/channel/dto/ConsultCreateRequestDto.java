@@ -9,6 +9,6 @@ public class ConsultCreateRequestDto {
     private String encounterId;
     private String specialty;
     private String reason;
-    private Long orderId;
+    private String orderId;
     private String channelRef;
 }
