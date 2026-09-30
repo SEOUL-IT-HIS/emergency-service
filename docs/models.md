@@ -28,12 +28,9 @@ DBMS: **Oracle** · 스키마: emergency-service 소유
 ```mermaid
 erDiagram
   BED ||--o{ BED_ASSIGNMENT : assigns
-  EQUIPMENT ||--o{ EQUIPMENT_ALLOCATION : allocates
   CPR_EVENT ||--o{ CPR_TIMELINE : has
   DISPOSITION ||--o| ADMISSION_REQUEST : may_have
   DISPOSITION ||--o| TRANSFER_NOTE : may_have
-  DISPOSITION ||--o| AMBULANCE_TRANSPORT : may_have
-  EMG_CODE_GROUP ||--o{ EMG_CODE : contains
 ```
 
 모든 업무 행은 `reception_id`(또는 API의 encounterId)로 응급 방문에 묶입니다.
@@ -56,10 +53,8 @@ erDiagram
 | --- | --- | --- |
 | `BED` | bed_no, zone_code, bed_type_code, bed_status_code | 마스터 |
 | `BED_ASSIGNMENT` | bed_id, assigned_at, released_at | 배정 이력 |
-| `EQUIPMENT` | asset_no, equipment_type_code, equipment_status_code | 마스터 |
-| `EQUIPMENT_ALLOCATION` | equipment_id, allocated_at, returned_at | 할당 이력 |
 
-혼잡도는 `BED`/`BED_ASSIGNMENT` 집계로 산출합니다.
+혼잡도는 `BED` 구역·상태 집계(`IX_BED_ZONE_STATUS` 인덱스)로 산출합니다. 의료기기(`EQUIPMENT*`)는 범위 제외.
 
 ### 3.3 응급진료
 
@@ -70,6 +65,7 @@ erDiagram
 | `MEDICATION_ADMINISTRATION` | order_id(**필수 정책**), order_item_id, drug_code, dose, route_code, administered_at | MAR |
 | `CPR_EVENT` | started_at, ended_at, outcome_code | CPR 부모 |
 | `CPR_TIMELINE` | cpr_event_id, event_at, event_type_code, detail | 타임라인 |
+| `CONSENT_RECORD` | reception_id, consent_type_code, consent_status_code, consented_by_code, consenter_name, reason, received_at, recorded_by_id | 동의 기록(이력, 종이 동의서 수령 사실만) |
 
 ### 3.4 채널·참조 (처방 원장 아님)
 
@@ -77,9 +73,7 @@ erDiagram
 | --- | --- | --- |
 | `LAB_IMAGING_RESULT_REF` | LAB 결과 링크/상태 캐시 (`result_ref`). 본문 SoT=LAB |
 | `PHARMACY_STATUS_REF` | 조제 상태 캐시. 라우팅 SoT=GR2→PHM |
-| `CONSULT_REQUEST` | 협진 채널 |
-| `SURGERY_REQUEST` | 수술·시술 채널 (헤더는 GR2) |
-| `ONCALL_REQUEST` | 당직 호출 |
+| ~~`CONSULT_REQUEST`~~ / ~~`SURGERY_ORDER_STATUS_REF`~~ / ~~`ONCALL_REQUEST`~~ | 협진·수술 요청·당직 — 범위 제외(코드 삭제, DB 테이블은 마무리 시점에 삭제 예정) |
 
 **이관·제거됨 (GR2 소유):** `CLINICAL_ORDER`, `VERBAL_ORDER_CONFIRM`, `ORDER_CHANGE_LOG`, `MEDICATION_ORDER`
 
@@ -91,16 +85,10 @@ erDiagram
 | `DISPOSITION` | disposition_type_code, decided_by_id, decided_at |
 | `ADMISSION_REQUEST` | disposition_id, target_dept_code, request_status_code |
 | `TRANSFER_NOTE` | target_hospital_code, content, written_* |
-| `AMBULANCE_TRANSPORT` | ambulance_no, transport_type_code, departed_at, arrived_at |
 
 ### 3.6 업무코드
 
-| 테이블 | 컬럼 |
-| --- | --- |
-| `EMG_CODE_GROUP` | group_code(UK), group_name, description, use_yn, sort_order |
-| `EMG_CODE` | emg_code_group_id, code_value, code_name, use_yn, sort_order |
-
-Unique: `(group, code_value)`
+응급 전용 업무코드 테이블(`EMG_CODE_GROUP`, `EMG_CODE`)은 범위에서 제외했다(2026-09-30). 코드는 admin 공통코드가 소유하며, 서비스는 admin 캐시를 우선 쓰고 없을 때만 코드 안 폴백 상수를 쓴다.
 
 ## 4. EMG 소유 코드그룹 (시드)
 
@@ -110,16 +98,16 @@ Unique: `(group, code_value)`
 | ZONE | RESUS, CRITICAL, URGENT, FAST_TRACK, PEDIATRIC, ISOLATION |
 | BED_TYPE | GENERAL, ICU_LIKE, ISOLATION, PEDIATRIC |
 | BED_STATUS | EMPTY, OCCUPIED, CLEANING, OUT_OF_SERVICE |
-| EQUIP_TYPE / EQUIP_STATUS | VENTILATOR… / AVAILABLE, IN_USE, MAINTENANCE |
 | ASSESSMENT_TYPE | INITIAL, REASSESS |
 | ISOLATION_TYPE | CONTACT, DROPLET, AIRBORNE, PROTECTIVE |
 | SCREENING_TYPE / RESULT | SEPSIS, STROKE / NEGATIVE, POSITIVE, INCONCLUSIVE |
 | ARRIVAL_PATH | EMS_119, WALK_IN, TRANSFER_IN, SELF_TRANSPORT |
 | TREATMENT_TYPE | AIRWAY, IV, SUTURE, CAST… |
 | CPR_EVENT_TYPE / CPR_OUTCOME | COMPRESSION, DEFIB… / ROSC, EXPIRED, TRANSFER |
-| CONSULT_STATUS | REQUESTED, ACCEPTED, REPLIED, CANCELLED |
 | DISPOSITION_TYPE | HOME, ADMIT, TRANSFER, DEATH, DAMA |
-| TRANSPORT_TYPE | BLS, ALS |
+| CONSENT_TYPE | SURGERY, ANESTHESIA, TRANSFUSION, PROCEDURE, PRIVACY |
+| CONSENT_STATUS | AGREED, REFUSED, DEFERRED |
+| CONSENT_BY | SELF, GUARDIAN |
 
 **EMG 시드 금지 (타 소유)**
 
@@ -146,5 +134,6 @@ Unique: `(group, code_value)`
 
 ## 6. 범위 외
 
-- **동의서 파일/테이블**: ERD상 시스템 범위 외 (UD2-25/26/27). 동의 여부는 향후 21.5 원칙으로 재설계.
+- **동의서 원본·서명**: 저장하지 않는다. 종이 동의서를 받은 사실만 `CONSENT_RECORD`에 기록(UD2-25).
+- **범위 제외 테이블**(2026-09-30): `CONSULT_REQUEST`, `ONCALL_REQUEST`, `SURGERY_ORDER_STATUS_REF`, `AMBULANCE_TRANSPORT`, `EQUIPMENT`, `EQUIPMENT_ALLOCATION`, `EMG_CODE_GROUP`, `EMG_CODE`.
 - 환자명·처방의명 등: 스냅샷 금지 → PAT/ADM API 조회.

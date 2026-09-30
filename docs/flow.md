@@ -126,26 +126,9 @@ sequenceDiagram
 
 ---
 
-## 6. 협진 / 당직 (채널 ≠ 처방)
+## 6. 협진 / 당직 — 범위 제외
 
-```mermaid
-sequenceDiagram
-  actor MD as 응급의
-  participant FE as Emergency FE
-  participant EMG as emergency-service
-  participant OPD as outpatient / inpatient
-  participant ADM as admin-service
-
-  MD->>FE: 협진 요청
-  FE->>EMG: POST /consultations
-  EMG-->>FE: CONSULT_REQUEST
-  Note over EMG,OPD: OPD /api/outpatient/referrals 와<br/>통합 여부 Open (이슈#7)
-
-  MD->>FE: 당직 호출
-  FE->>EMG: POST /on-call-pages
-  EMG->>ADM: 알림 대행? (역할 미확정)
-  EMG-->>FE: ONCALL_REQUEST
-```
+협진 요청·당직의 호출은 프로젝트 기간 단축으로 **범위에서 제외**했다(2026-09-30, UML `01-5 최종`). `/consultations`, `/on-call-pages` API와 `CONSULT_REQUEST`·`ONCALL_REQUEST` 코드는 삭제했다. (번호는 유지)
 
 ---
 
@@ -252,5 +235,4 @@ Component ──dispatch──► Slice(*Request)
 | LAB/PHM 오더 POST를 EMG에서 직통 | GR2 생성 + 코어 라우팅 |
 | 환자명·약명을 컬럼에 복제 | 식별자 + API/배치 조회 |
 | 알레르기를 EMG에 POST | PAT safety-info만 |
-| 협진을 `/orders` 하위 API로 구현 | `/consultations` 분리 |
-| 동의 PDF를 EMG에 저장 | Admin 양식 + 동의여부만 |
+| 동의서 원본·서명을 EMG에 저장 | 종이 동의서 수령 사실만 `CONSENT_RECORD`에 기록 |

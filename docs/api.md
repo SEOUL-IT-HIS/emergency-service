@@ -34,9 +34,8 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
-| UC-RES-01 | GET | `/api/emergency/resources/congestion` | 혼잡도/과밀화 | - |
+| UC-RES-01 | GET | `/api/emergency/resources/congestion` | 구역별 혼잡도(현황판이 사용, 별도 UC 아님) | - |
 | UC-RES-02 | POST | `/api/emergency/resources/bed-assignments` | 병상 배정 | encounterId, bedId |
-| UC-RES-03 | POST | `/api/emergency/resources/equipment-assignments` | 기기 할당 | encounterId, equipmentId |
 
 ### 2.3 ER-CARE
 
@@ -47,40 +46,35 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | UC-CARE-03 | POST | `/api/emergency/care/treatments` | 처치기록 | encounterId, treatmentCode, orderId?(GR2) |
 | UC-CARE-04 | POST | `/api/emergency/care/medication-administrations` | MAR | encounterId, **orderId(GR2)**, administeredAt, dose |
 | UC-CARE-05 | POST | `/api/emergency/care/cpr-timelines` | CPR | encounterId, events[] |
+| UC-CARE-06 | POST | `/api/emergency/care/consents` | 동의 기록(종이 동의서 수령 사실만, 서명·파일 없음. 유예=DEFERRED+reason) | encounterId, consentTypeCode, consentStatusCode, consentedByCode, recordedById |
+| UC-CARE-06 | GET | `/api/emergency/care/consents` | 접수 건별 동의 기록(수령 일시 최신순) | receptionId |
 
 ### 2.4 ER-CHANNEL
 
-| UC | Method | Endpoint | 설명 | 필수 파라미터 |
-| --- | --- | --- | --- | --- |
-| UC-ORD-09 | POST | `/api/emergency/consultations` | 협진 (오더 원장 아님) | encounterId, specialty, reason |
-| UC-ORD-11 | POST | `/api/emergency/on-call-pages` | 당직 호출 | encounterId, targetRole |
+> **범위 조정 (2026-09-30, UML `01-5 최종`)**: 협진 요청·당직의 호출·수술-시술 긴급 요청·외부 병원 전원 정보 조회·응급 의료기기 할당·구급차 이송 기록·응급업무코드 CRUD는 프로젝트 기간 단축으로 **범위에서 제외**했다(코드 삭제 완료). 혼잡도 지표는 종합 현황판에 통합, 동의는 종이 원본 수령 사실만 기록하는 `동의 기록` 1개로 축소.
+
+협진(`/consultations`)·당직(`/on-call-pages`)·수술 요청 API는 삭제했다. 이 채널에 남은 API는 없다.
 
 ### 2.5 ER-MONITOR
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
 | UC-MON-01 | GET | `/api/emergency/monitor/dashboard` | 종합 현황판 | - |
-| UC-MON-02 | GET | `/api/emergency/monitor/long-stay-alerts` | 장기체류 알림 | thresholdHours? |
-| UC-MON-03 | GET | `/api/emergency/monitor/external-hospitals` | 외부병원/NEDIS | - |
+| UC-MON-02 | GET | `/api/emergency/monitor/long-stay-alerts` | 장기체류 알림(미확인) | thresholdHours? |
+| UC-MON-02 | PATCH | `/api/emergency/monitor/long-stay-alerts/{alertId}/acknowledge` | 알림 확인 처리(없는 알림 404, 이미 확인 409) | alertId, acknowledgedById |
 
 ### 2.6 ER-DISPOSITION
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
 | UC-DISP-01 | POST | `/api/emergency/dispositions` | 퇴실 결정 | encounterId, dispositionType |
+| UC-DISP-01 | GET | `/api/emergency/dispositions` | 접수 건별 퇴실 결정 이력(최신이 첫 번째) | receptionId |
 | UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청 | id, wardPrefer? |
 | UC-DISP-03 | POST | `/api/emergency/dispositions/{id}/transfer-note` | 전원 소견서 | id (투약은 GR2 조회) |
-| UC-DISP-04 | POST | `/api/emergency/dispositions/{id}/ambulance-transport` | 이송 기록 | id, transportMeta |
 
 ### 2.7 ER-CODE (응급 전용)
 
-| No | Method | Endpoint | 설명 |
-| --- | --- | --- | --- |
-| 1 | GET | `/api/emergency/codes` | 코드그룹·코드 목록 |
-| 2 | GET | `/api/emergency/codes/{groupCode}` | 그룹별 코드 |
-| 3 | POST | `/api/emergency/codes` | 등록 |
-| 4 | PUT | `/api/emergency/codes/{codeId}` | 수정 (코드값 변경 지양) |
-| 5 | PUT | `/api/emergency/codes/{codeId}/use-yn` | 사용여부 (삭제 대체) |
+> 응급업무코드 조회·등록·수정·사용여부 변경은 **범위에서 제외**(2026-09-30). `/api/emergency/codes` 삭제, 코드는 admin 공통코드로 일원화(캐시 우선·없으면 코드 안 폴백).
 
 ---
 
@@ -103,7 +97,6 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | UC-ORD-C09 | GET | `/api/orders/{orderId}/routes` | 라우팅 | orderId |
 | UC-ORD-05 | POST | `/api/orders` | 검사 STAT | orderType=EXAM, priority=STAT, … |
 | UC-ORD-07 | POST | `/api/orders` (+route) | 조제 라우팅 | ACTIVE orderId |
-| UC-ORD-10 | POST | `/api/orders` | 수술 | orderType=SURGERY (Q-SURGERY) |
 | UC-ORD-C10 | POST | `/api/orders/{orderId}/acknowledge` | ACK | W0 Open |
 
 ---
@@ -137,7 +130,6 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | `.../lab-imaging/{id}/result` | 유지 시 Provider=LAB 명시 | 결과 SoT=LAB |
 | `/api/emergency/orders/pharmacy` 직통 | 폐기→GR2 | PHM 직통 금지 |
 | `/api/emergency/.../allergy` POST | 제거 | PAT SoT |
-| 협진/당직을 orders 하위 | → consultations / on-call-pages | 채널 ≠ 처방 |
 
 ---
 

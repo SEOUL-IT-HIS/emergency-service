@@ -23,12 +23,12 @@
 | 컴포넌트 | 책임 | 소유 데이터 |
 | --- | --- | --- |
 | ER-TRIAGE | 중증도·활력·격리·스크리닝·EMS | TRIAGE_*, EWS, ISOLATION, RISK, EMS_REFERRAL |
-| ER-RESOURCE | 병상·기기·혼잡도 | BED*, EQUIPMENT* |
-| ER-CARE | EMR·처치·MAR·CPR | CLINICAL_NOTE, TREATMENT, MAR, CPR_* |
-| ER-CHANNEL | 협진·당직·수술요청(채널) | CONSULT/ONCALL/SURGERY_REQUEST |
+| ER-RESOURCE | 병상·혼잡도(집계) | BED* |
+| ER-CARE | EMR·처치·MAR·CPR·동의 기록 | CLINICAL_NOTE, TREATMENT, MAR, CPR_*, CONSENT_RECORD |
+| ~~ER-CHANNEL~~ | ~~협진·당직·수술요청(채널)~~ — 범위 제외(2026-09-30) | - |
 | ER-MONITOR | 현황판·LOS | LOS_ALERT (+집계) |
-| ER-DISPOSITION | 퇴실·입원요청·전원·이송 | DISPOSITION, ADMISSION_*, TRANSFER, AMBULANCE |
-| ER-CODE | 응급 전용 코드 | EMG_CODE_GROUP, EMG_CODE |
+| ER-DISPOSITION | 퇴실·입원요청·전원소견서 | DISPOSITION, ADMISSION_*, TRANSFER_NOTE |
+| ~~ER-CODE~~ | ~~응급 전용 코드~~ — 범위 제외, admin 공통코드로 일원화 | - |
 | ER-RESULT(참조) | 결과/조제 캐시·링크 | LAB_IMAGING_RESULT_REF, PHARMACY_STATUS_REF |
 
 처방 원장(CLINICAL_ORDER 등)은 **EMG DB에서 제거·이관**되었으며 GR2 소유입니다.
@@ -42,9 +42,9 @@
 | 검사·영상 결과 본문 | LAB | Consumer / 캐시 가능 |
 | 환자·알레르기·안전정보 | PAT | 조회만 (쓰기 금지) |
 | 공통코드(KTAS명·진료과·약품·KCD) | ADM | 조회만 |
-| 응급 전용 업무코드 | EMG | Provider |
+| 업무코드(동의서 종류·동의 여부 등 포함) | ADM 공통코드 | 조회만(캐시 우선, 없으면 코드 안 폴백) |
 | 문서 빈 양식(PDF) | ADM `DOCUMENT_TEMPLATE` | 출력·동의여부만 (미구현) |
-| 동의 여부 | 업무 서비스 | 전자문서 파일 미저장 |
+| 동의 기록 | EMG | Provider (종이 동의서 수령 사실만, 파일·서명 미저장) |
 
 **금지:** `/api/emergency/orders*` 를 처방 Provider로 두는 것 · EMG→LAB/PHM/SUR 직통 오더 생성 · 알레르기 dual-write
 
@@ -62,12 +62,12 @@
 │ (RCP)    │ 목록제공 │  (EMG)     │ 조회    │ (PAT)    │
 └──────────┘         └─────┬──────┘         └──────────┘
                            │
-   consultations(동기) / admission-request(비동기, Kafka)
+   admission-request(비동기, Kafka)
                            │
                     OPD / IPT / ADM
 ```
 
-- 동기: REST — 협진(`/consultations`), 병상 가용 조회(`GET`, IPT — 쓰기 없음)
+- 동기: REST — 병상 가용 조회(`GET`, IPT — 쓰기 없음)
 - 비동기(Kafka): `order.created|confirmed|updated|cancelled|routed|validation.completed` 구독 + 입원요청 코레오그래피 `ADMISSION_REQUESTED → REGISTRATION_COMPLETED → BED_ASSIGNED`(오케스트레이터 없음, 상세: `flow.md` 7-1장)
 - BFF: 경로가 `/api/emergency/*` 이어도 **데이터 Provider는 실제 소유자**로 문서화
 
@@ -132,9 +132,9 @@ infrastructure → JPA/MyBatis, Feign/WebClient (Consumer), Oracle
 | --- | --- | --- |
 | Q-ROUTE-OWNER | LAB/SUR 전송 주체(기본=코어) | 직통 API 폐기 범위 |
 | Q-ACK | ACKNOWLEDGED 사용 여부 | 간호 ACK |
-| Q-SURGERY | SURGERY 코어 vs 채널문서만 | UC-ORD-10 |
+| ~~Q-SURGERY~~ | 수술 긴급 요청 범위 제외로 해소 | - |
 | Q-EXAM | EXAM 코어 이관 시점 | 긴급오더 |
-| Q-CHANNEL-REF | channelRef 필수 여부 | 협진·수술 추적 |
+| ~~Q-CHANNEL-REF~~ | 협진·수술 범위 제외로 해소 | - |
 | Q-MAR-ORDERID | orderId 필수 강제 시점 | 처치/MAR |
 | Q-RESULT-PATH | BFF vs LAB 직조회 | 결과 경로 |
 
