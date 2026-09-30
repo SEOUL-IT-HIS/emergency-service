@@ -11,5 +11,7 @@ public interface DispositionRepository extends JpaRepository<Disposition, String
     @Query("SELECT DISTINCT d.receptionId FROM Disposition d WHERE d.receptionId IS NOT NULL")
     List<String> findDistinctReceptionIds();
 
+    List<Disposition> findByReceptionIdIn(java.util.Collection<String> receptionIds);
+
     List<Disposition> findByReceptionIdOrderByDecidedAtDesc(String receptionId);
 }

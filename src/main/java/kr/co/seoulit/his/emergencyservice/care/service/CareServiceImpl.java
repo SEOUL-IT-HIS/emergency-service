@@ -5,6 +5,11 @@ import kr.co.seoulit.his.emergencyservice.care.entity.*;
 import kr.co.seoulit.his.emergencyservice.care.mapper.CareMapstructMapper;
 import kr.co.seoulit.his.emergencyservice.care.repository.*;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.disposition.entity.AdmissionRequest;
+import kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
@@ -46,6 +51,13 @@ public class CareServiceImpl implements CareService {
     private final CommonCodeResolver codeResolver;
     private final CareMapstructMapper careMapper;
     private final PatientClient patientClient;
+    private final DispositionRepository dispositionRepository;
+    private final AdmissionRequestRepository admissionRequestRepository;
+    private final TransferNoteRepository transferNoteRepository;
+
+    /** 목록 상태(저장하는 코드가 아니라 화면 필터용 계산값): 진료 중 / 퇴실 처리 완료 */
+    public static final String CARE_STATUS_IN_CARE = "IN_CARE";
+    public static final String CARE_STATUS_DONE = "DONE";
 
     @Override
     @Transactional(readOnly = true)
@@ -66,6 +78,7 @@ public class CareServiceImpl implements CareService {
 
         Map<String, String> patientNames = patientClient.getPatients(patientIds).stream()
                 .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName));
+        Set<String> doneReceptionIds = doneReceptionIds(intakes);
 
         return intakes.stream()
                 .filter(intake -> {
@@ -81,7 +94,7 @@ public class CareServiceImpl implements CareService {
                     dto.setReceptionId(intake.getId());
                     dto.setPatientName(patientNames.get(intake.getPatientId()));
                     dto.setReceivedAt(intake.getReceivedAt());
-                    dto.setCareStatusCode("IN_CARE");
+                    dto.setCareStatusCode(doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE);
 
                     List<TriageAssessment> history =
                             triageAssessmentRepository.findByReceptionIdOrderByAssessedAtAsc(intake.getId());
@@ -101,6 +114,55 @@ public class CareServiceImpl implements CareService {
                 })
                 .filter(dto -> !StringUtils.hasText(status) || status.equals(dto.getCareStatusCode()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 퇴실 처리가 끝난 접수 건 — 최신 퇴실 결정 기준.
+     * 귀가·사망·자의퇴원은 결정 즉시 완료, 입원은 병동이 병상 배정을 회신하면 완료(요청됨·거부는 계속 진료 중),
+     * 전원은 전원 소견서를 쓰면 완료. 퇴실 결정이 없으면 진료 중.
+     */
+    private Set<String> doneReceptionIds(List<ReceptionIntake> intakes) {
+        List<String> ids = intakes.stream().map(ReceptionIntake::getId).collect(Collectors.toList());
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        Map<String, Disposition> latest = new java.util.HashMap<>();
+        for (Disposition d : dispositionRepository.findByReceptionIdIn(ids)) {
+            Disposition cur = latest.get(d.getReceptionId());
+            if (cur == null || (d.getDecidedAt() != null && (cur.getDecidedAt() == null || d.getDecidedAt().isAfter(cur.getDecidedAt())))) {
+                latest.put(d.getReceptionId(), d);
+            }
+        }
+        List<String> dispositionIds = latest.values().stream().map(Disposition::getId).collect(Collectors.toList());
+        Set<String> bedAssigned = new java.util.HashSet<>();
+        Set<String> withTransferNote = new java.util.HashSet<>();
+        if (!dispositionIds.isEmpty()) {
+            // 입원요청은 가장 최근 요청의 상태로 본다
+            Map<String, AdmissionRequest> latestRequest = new java.util.HashMap<>();
+            for (AdmissionRequest a : admissionRequestRepository.findByDispositionIdIn(dispositionIds)) {
+                AdmissionRequest cur = latestRequest.get(a.getDisposition().getId());
+                if (cur == null || (a.getRequestedAt() != null && (cur.getRequestedAt() == null || a.getRequestedAt().isAfter(cur.getRequestedAt())))) {
+                    latestRequest.put(a.getDisposition().getId(), a);
+                }
+            }
+            latestRequest.forEach((id, a) -> {
+                if (EmgCodes.ADMISSION_BED_ASSIGNED.equals(a.getRequestStatusCode())) {
+                    bedAssigned.add(id);
+                }
+            });
+            transferNoteRepository.findByDispositionIdIn(dispositionIds).forEach(n -> withTransferNote.add(n.getDisposition().getId()));
+        }
+        Set<String> done = new java.util.HashSet<>();
+        latest.forEach((receptionId, d) -> {
+            String type = d.getDispositionTypeCode();
+            boolean finished = EmgCodes.DISPOSITION_ADMIT.equals(type) ? bedAssigned.contains(d.getId())
+                    : EmgCodes.DISPOSITION_TRANSFER.equals(type) ? withTransferNote.contains(d.getId())
+                    : true;
+            if (finished) {
+                done.add(receptionId);
+            }
+        });
+        return done;
     }
 
     @Override

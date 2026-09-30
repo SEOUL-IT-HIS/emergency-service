@@ -43,7 +43,10 @@ class CareServiceImplCodeTest {
                 cache,
                 new CommonCodeResolver(cache),
                 mock(CareMapstructMapper.class),
-                mock(PatientClient.class));
+                mock(PatientClient.class),
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository.class),
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository.class),
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository.class));
     }
 
     @Test
