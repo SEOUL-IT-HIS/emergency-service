@@ -5,5 +5,5 @@ workdir /app
 
 add ./build/libs/*.jar /app/app.jar
 
-EXPOSE 8085
+EXPOSE 8089
 entrypoint ["java", "-jar", "app.jar"]
