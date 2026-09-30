@@ -43,8 +43,11 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- | --- |
 | UC-CARE-01 | GET | `/api/emergency/care/patients` | 응급환자 목록 | date, status? |
 | UC-CARE-02 | POST | `/api/emergency/care/records` | 진료기록 | encounterId, content |
+| UC-CARE-03 | GET | `/api/emergency/care/treatments` | 접수 건별 처치기록(시행 시각 순) | receptionId |
 | UC-CARE-03 | POST | `/api/emergency/care/treatments` | 처치기록 | encounterId, treatmentCode, orderId?(GR2) |
+| UC-CARE-04 | GET | `/api/emergency/care/medication-administrations` | 접수 건별 투여기록(투여 시각 순) | receptionId |
 | UC-CARE-04 | POST | `/api/emergency/care/medication-administrations` | MAR | encounterId, **orderId(GR2)**, administeredAt, dose |
+| UC-CARE-05 | GET | `/api/emergency/care/cpr-timelines` | 접수 건별 CPR 기록(최신 시작 순, 타임라인은 이벤트 시각 순) | receptionId |
 | UC-CARE-05 | POST | `/api/emergency/care/cpr-timelines` | CPR | encounterId, events[] |
 | UC-CARE-06 | POST | `/api/emergency/care/consents` | 동의 기록(종이 동의서 수령 사실만, 서명·파일 없음. 유예=DEFERRED+reason) | encounterId, consentTypeCode, consentStatusCode, consentedByCode, recordedById |
 | UC-CARE-06 | GET | `/api/emergency/care/consents` | 접수 건별 동의 기록(수령 일시 최신순) | receptionId |
@@ -69,8 +72,10 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- | --- |
 | UC-DISP-01 | POST | `/api/emergency/dispositions` | 퇴실 결정 | encounterId, dispositionType |
 | UC-DISP-01 | GET | `/api/emergency/dispositions` | 접수 건별 퇴실 결정 이력(최신이 첫 번째) | receptionId |
-| UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청 | id, wardPrefer? |
-| UC-DISP-03 | POST | `/api/emergency/dispositions/{id}/transfer-note` | 전원 소견서 | id (투약은 GR2 조회) |
+| UC-DISP-02 | GET | `/api/emergency/dispositions/{id}/admission-requests` | 입원요청 이력(최신이 첫 번째). 상태는 병동 회신(Kafka)으로 갱신 | id |
+| UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청(퇴실 유형 입원만, 요청됨·배정 완료 상태가 있으면 409, 저장 후 병동으로 Kafka 발행) | id, targetDeptCode?, wardPrefer? |
+| UC-DISP-03 | GET | `/api/emergency/dispositions/{id}/transfer-notes` | 전원 소견서 목록(최신이 첫 번째) | id |
+| UC-DISP-03 | POST | `/api/emergency/dispositions/{id}/transfer-note` | 전원 소견서(퇴실 유형 전원만) | id, targetHospitalCode, content, writtenById |
 
 ### 2.7 ER-CODE (응급 전용)
 
