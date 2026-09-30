@@ -7,7 +7,9 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "EMERGENCY", name = "BED")
+@Table(schema = "EMERGENCY", name = "BED",
+        // BED_ID를 끝에 둬야 zone/status가 둘 다 null인 행도 인덱스에 들어가서 혼잡도 집계가 인덱스만으로 끝난다
+        indexes = @Index(name = "IX_BED_ZONE_STATUS", columnList = "ZONE_CODE, BED_STATUS_CODE, BED_ID"))
 @Getter
 @Setter
 public class Bed {
