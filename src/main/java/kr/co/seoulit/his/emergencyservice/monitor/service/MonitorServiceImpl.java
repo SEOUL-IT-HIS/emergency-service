@@ -4,7 +4,7 @@ import kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake;
 import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
-import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.monitor.dto.*;
 import kr.co.seoulit.his.emergencyservice.monitor.entity.LosAlert;
 import kr.co.seoulit.his.emergencyservice.monitor.repository.LosAlertRepository;
@@ -30,7 +30,7 @@ public class MonitorServiceImpl implements MonitorService {
 
     private final LosAlertRepository losAlertRepository;
     private final ReceptionIntakeRepository receptionIntakeRepository;
-    private final DispositionRepository dispositionRepository;
+    private final DischargeProgress dischargeProgress;
     private final ResourceService resourceService;
     private final PatientClient patientClient;
 
@@ -42,12 +42,14 @@ public class MonitorServiceImpl implements MonitorService {
     @Transactional(readOnly = true)
     public DashboardDto getDashboard() {
         CongestionMetricDto congestion = resourceService.getCongestion().getTotal();
-        List<LosAlert> openAlerts = losAlertRepository.findByAcknowledgedAtIsNull();
-        Set<String> disposed = new HashSet<>(dispositionRepository.findDistinctReceptionIds());
+        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
+        // 재실 = 퇴실 처리가 끝나지 않은 접수(환자 목록 '진료 중'과 같은 기준). 입원 병상 대기 환자도 재실이다.
+        Set<String> done = doneReceptionIds(intakes);
+        List<LosAlert> openAlerts = openAlertsOfPatientsInCare(done);
 
         DashboardDto dto = new DashboardDto();
-        dto.setCurrentPatients(receptionIntakeRepository.findAll().stream()
-                .filter(intake -> !disposed.contains(intake.getId()))
+        dto.setCurrentPatients(intakes.stream()
+                .filter(intake -> !done.contains(intake.getId()))
                 .count());
         dto.setOccupiedBeds(congestion.getOccupiedBeds());
         dto.setAvailableBeds(congestion.getAvailableBeds());
@@ -62,14 +64,15 @@ public class MonitorServiceImpl implements MonitorService {
     @Transactional(readOnly = true)
     public List<LosAlertDto> getLongStayAlerts(Integer thresholdHours) {
         int minutes = thresholdHours != null ? thresholdHours * 60 : 360;
-        List<LosAlert> alerts = losAlertRepository.findByAcknowledgedAtIsNull().stream()
+        Set<String> done = doneReceptionIds(receptionIntakeRepository.findAll());
+        List<LosAlert> alerts = openAlertsOfPatientsInCare(done).stream()
                 .filter(a -> a.getThresholdMinutes() == null || a.getThresholdMinutes() >= minutes)
                 .toList();
         return toDtoList(alerts);
     }
 
     /**
-     * 재실 환자(퇴실 결정 없는 접수) 중 접수 후 기준시간을 넘긴 건에 LOS_ALERT 를 만든다.
+     * 재실 환자(퇴실 처리가 끝나지 않은 접수 — 입원 병상 대기·전원 소견서 전 포함) 중 접수 후 기준시간을 넘긴 건에 LOS_ALERT 를 만든다.
      * 같은 기준시간 알림은 접수 건당 1번만 — 확인(acknowledge)한 뒤 다시 울리지 않는다.
      */
     @Override
@@ -77,10 +80,11 @@ public class MonitorServiceImpl implements MonitorService {
     public int detectLongStayPatients() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoff = now.minusMinutes(losThresholdMinutes);
-        Set<String> disposed = new HashSet<>(dispositionRepository.findDistinctReceptionIds());
+        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
+        Set<String> disposed = doneReceptionIds(intakes);
 
         int created = 0;
-        for (ReceptionIntake intake : receptionIntakeRepository.findAll()) {
+        for (ReceptionIntake intake : intakes) {
             if (intake.getReceivedAt() == null || intake.getReceivedAt().isAfter(cutoff)
                     || disposed.contains(intake.getId())
                     || losAlertRepository.existsByReceptionIdAndThresholdMinutes(intake.getId(), losThresholdMinutes)) {
@@ -126,7 +130,9 @@ public class MonitorServiceImpl implements MonitorService {
         }
 
         List<String> receptionIds = alerts.stream().map(LosAlert::getReceptionId).distinct().toList();
+        // patientId 가 없는 접수는 뺀다(toMap 은 null 값을 받지 못해 현황판 전체가 500 이 된다)
         Map<String, String> patientIdByReceptionId = receptionIntakeRepository.findAllById(receptionIds).stream()
+                .filter(intake -> intake.getPatientId() != null)
                 .collect(Collectors.toMap(ReceptionIntake::getId, ReceptionIntake::getPatientId, (a, b) -> a));
 
         List<String> patientIds = patientIdByReceptionId.values().stream()
@@ -134,14 +140,22 @@ public class MonitorServiceImpl implements MonitorService {
                 .filter(this::isValidPatientId)
                 .distinct()
                 .toList();
-        Map<String, String> patientNames = patientClient.getPatients(patientIds).stream()
-                .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName));
+        // 환자서비스가 응답하지 않아도 현황판은 떠야 한다(이름만 비움, 환자 목록과 같은 처리)
+        Map<String, String> patientNames;
+        try {
+            patientNames = patientClient.getPatients(patientIds).stream()
+                    .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName, (a, b) -> a));
+        } catch (RuntimeException e) {
+            log.warn("환자서비스 조회 실패 - 환자명 없이 장기체류 알림을 내려줍니다: {}", e.getMessage());
+            patientNames = Collections.emptyMap(); // Map.of() 는 get(null) 에서 예외가 나므로 쓰지 않는다
+        }
+        final Map<String, String> names = patientNames;
 
         return alerts.stream().map(alert -> {
             LosAlertDto dto = new LosAlertDto();
             dto.setId(alert.getId());
             dto.setReceptionId(alert.getReceptionId());
-            dto.setPatientName(patientNames.get(patientIdByReceptionId.get(alert.getReceptionId())));
+            dto.setPatientName(names.get(patientIdByReceptionId.get(alert.getReceptionId())));
             dto.setThresholdMinutes(alert.getThresholdMinutes());
             dto.setTriggeredAt(alert.getTriggeredAt());
             dto.setAcknowledgedById(alert.getAcknowledgedById());
@@ -160,5 +174,16 @@ public class MonitorServiceImpl implements MonitorService {
             log.warn("PAT 배치조회 대상에서 제외 - patientId가 UUID 형식이 아님: {}", patientId);
             return false;
         }
+    }
+
+    private Set<String> doneReceptionIds(List<ReceptionIntake> intakes) {
+        return dischargeProgress.doneReceptionIds(intakes.stream().map(ReceptionIntake::getId).toList());
+    }
+
+    /** 미확인 알림 중 아직 재실 중인 환자 것만 — 퇴실 처리가 끝난 환자의 알림은 현황판에서 뺀다 */
+    private List<LosAlert> openAlertsOfPatientsInCare(Set<String> done) {
+        return losAlertRepository.findByAcknowledgedAtIsNull().stream()
+                .filter(a -> !done.contains(a.getReceptionId()))
+                .toList();
     }
 }

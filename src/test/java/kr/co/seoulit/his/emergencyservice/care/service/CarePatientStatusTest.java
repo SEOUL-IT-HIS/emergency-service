@@ -13,6 +13,7 @@ import kr.co.seoulit.his.emergencyservice.disposition.entity.TransferNote;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.patient.client.PatientClient;
 import kr.co.seoulit.his.emergencyservice.resource.repository.BedAssignmentRepository;
 import kr.co.seoulit.his.emergencyservice.triage.repository.TriageAssessmentRepository;
@@ -47,7 +48,8 @@ class CarePatientStatusTest {
                 mock(MedicationAdministrationRepository.class), mock(CprEventRepository.class),
                 mock(TriageAssessmentRepository.class), mock(BedAssignmentRepository.class),
                 receptionIntakeRepository, cache, new CommonCodeResolver(cache), mock(CareMapstructMapper.class),
-                mock(PatientClient.class), dispositionRepository, admissionRequestRepository, transferNoteRepository);
+                mock(PatientClient.class),
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository));
         for (String id : List.of("none", "home", "admit-wait", "admit-ok", "admit-rejected", "tr-none", "tr-note")) {
             ReceptionIntake r = new ReceptionIntake();
             r.setId(id);

@@ -6,6 +6,8 @@ import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.AdmissionRequestCreateDto;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.AdmissionRequestDto;
+import kr.co.seoulit.his.emergencyservice.disposition.dto.DispositionCreateRequestDto;
+import kr.co.seoulit.his.emergencyservice.disposition.dto.DispositionDto;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.TransferNoteCreateDto;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.AdmissionRequest;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition;
@@ -31,6 +33,7 @@ class DispositionFollowUpTest {
 
     private DispositionRepository dispositionRepository;
     private AdmissionRequestRepository admissionRequestRepository;
+    private TransferNoteRepository transferNoteRepository;
     private DispositionServiceImpl service;
     private AdmissionEventPublisher publisher;
 
@@ -43,10 +46,17 @@ class DispositionFollowUpTest {
             a.setId("ar-new");
             return a;
         });
+        when(dispositionRepository.save(any(Disposition.class))).thenAnswer(inv -> {
+            Disposition d = inv.getArgument(0);
+            d.setId("d-saved");
+            return d;
+        });
+        transferNoteRepository = mock(TransferNoteRepository.class);
         CommonCodeCache cache = new CommonCodeCache();
         publisher = mock(AdmissionEventPublisher.class);
         service = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
-                mock(TransferNoteRepository.class), cache, new CommonCodeResolver(cache), publisher);
+                transferNoteRepository, cache, new CommonCodeResolver(cache), publisher,
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository));
     }
 
     private Disposition disposition(String id, String typeCode) {
@@ -162,5 +172,80 @@ class DispositionFollowUpTest {
         r.setContent("transfer summary");
         r.setTargetHospitalCode("99");
         assertThatThrownBy(() -> service.createTransferNote("d-tr", r)).hasMessageContaining("targetHospitalCode");
+    }
+
+    // ----- 퇴실 결정 변경 -----
+
+    /** 접수 r-1 에 최신 결정 하나를 두고, 그 결정의 입원요청 이력을 지정한다 */
+    private Disposition decided(String type, AdmissionRequest... requests) {
+        Disposition d = disposition("d-old", type);
+        d.setReceptionId("r-1");
+        d.setDecidedAt(LocalDateTime.now().minusMinutes(10));
+        when(dispositionRepository.findByReceptionIdIn(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(List.of(d));
+        when(dispositionRepository.findByReceptionIdOrderByDecidedAtDesc("r-1")).thenReturn(List.of(d));
+        List<AdmissionRequest> list = new java.util.ArrayList<>();
+        for (AdmissionRequest a : requests) {
+            a.setDisposition(d);
+            list.add(a);
+        }
+        when(admissionRequestRepository.findByDispositionIdIn(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(list);
+        return d;
+    }
+
+    private DispositionCreateRequestDto decide(String type) {
+        DispositionCreateRequestDto req = new DispositionCreateRequestDto();
+        req.setEncounterId("r-1");
+        req.setDispositionType(type);
+        return req;
+    }
+
+    @Test
+    void firstDecisionIsFreeAndAdmitOrTransferStaysChangeable() {
+        DispositionDto admit = service.createDisposition(decide(EmgCodes.DISPOSITION_ADMIT));
+        assertThat(admit.isChangeable()).isTrue();
+        DispositionDto home = service.createDisposition(decide(EmgCodes.DISPOSITION_HOME));
+        assertThat(home.isChangeable()).isFalse();
+    }
+
+    @Test
+    void admitCanBeChangedAfterTheWardRejectsIt() {
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_REJECTED));
+        assertThat(service.getDispositions("r-1").get(0).isChangeable()).isTrue();
+
+        DispositionDto changed = service.createDisposition(decide(EmgCodes.DISPOSITION_TRANSFER));
+        assertThat(changed.getDispositionTypeCode()).isEqualTo(EmgCodes.DISPOSITION_TRANSFER);
+        // 같은 유형으로 다시 결정하는 건 의미가 없다(입원이면 재요청을 쓴다)
+        assertThatThrownBy(() -> service.createDisposition(decide(EmgCodes.DISPOSITION_ADMIT)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already");
+    }
+
+    @Test
+    void decisionIsLockedWhileWaitingForTheWardOrWhenFinished() {
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_REQUESTED));
+        assertThat(service.getDispositions("r-1").get(0).isChangeable()).isFalse();
+        assertThatThrownBy(() -> service.createDisposition(decide(EmgCodes.DISPOSITION_HOME)))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("WAITING_WARD");
+
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_BED_ASSIGNED));
+        assertThatThrownBy(() -> service.createDisposition(decide(EmgCodes.DISPOSITION_HOME)))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("DONE");
+
+        // 귀가 등은 결정 즉시 완료 — 중복 결정도 막힌다
+        decided(EmgCodes.DISPOSITION_HOME);
+        assertThatThrownBy(() -> service.createDisposition(decide(EmgCodes.DISPOSITION_HOME)))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void followUpsCannotBeAttachedToAReplacedDecision() {
+        Disposition old = disposition("d-admit-old", EmgCodes.DISPOSITION_ADMIT);
+        old.setReceptionId("r-2");
+        Disposition newer = disposition("d-home-new", EmgCodes.DISPOSITION_HOME);
+        newer.setReceptionId("r-2");
+        when(dispositionRepository.findByReceptionIdOrderByDecidedAtDesc("r-2")).thenReturn(List.of(newer, old));
+
+        assertThatThrownBy(() -> service.createAdmissionRequest("d-admit-old", new AdmissionRequestCreateDto()))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("replaced");
+        org.mockito.Mockito.verifyNoInteractions(publisher);
     }
 }

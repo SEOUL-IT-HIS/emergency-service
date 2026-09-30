@@ -34,6 +34,7 @@ public class DispositionServiceImpl implements DispositionService {
     private final CommonCodeCache commonCodeCache;
     private final CommonCodeResolver codeResolver;
     private final AdmissionEventPublisher admissionEventPublisher;
+    private final DischargeProgress dischargeProgress;
 
     @Override
     @Transactional
@@ -45,6 +46,19 @@ public class DispositionServiceImpl implements DispositionService {
         if (!validTypes.contains(request.getDispositionType())) {
             throw new IllegalArgumentException("dispositionType must be one of " + String.join(", ", validTypes));
         }
+        // 이미 결정이 있으면 '결정 변경'이다. 후속 조치 전(OPEN: 입원요청 없음·거부됨, 전원 소견서 없음)일 때만 허용한다.
+        // 퇴실 처리가 끝났거나(DONE) 병동 회신을 기다리는 중(WAITING_WARD)이면 바꿀 수 없다. 이력은 새 행으로 쌓이고 최신 결정이 적용된다.
+        DischargeProgress.Stage stage = dischargeProgress.stage(request.getEncounterId());
+        if (stage == DischargeProgress.Stage.DONE || stage == DischargeProgress.Stage.WAITING_WARD) {
+            throw new ConflictException("disposition cannot be changed (" + stage + ") for reception: "
+                    + request.getEncounterId());
+        }
+        if (stage == DischargeProgress.Stage.OPEN) {
+            String currentType = latestDisposition(request.getEncounterId()).map(Disposition::getDispositionTypeCode).orElse(null);
+            if (request.getDispositionType().equals(currentType)) {
+                throw new IllegalArgumentException("dispositionType is already " + currentType);
+            }
+        }
         Disposition entity = new Disposition();
         entity.setReceptionId(request.getEncounterId());
         entity.setDispositionTypeCode(request.getDispositionType());
@@ -52,13 +66,18 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setDecidedAt(LocalDateTime.now());
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return toDispositionDto(dispositionRepository.save(entity));
+        DispositionDto dto = toDispositionDto(dispositionRepository.save(entity));
+        // 새 결정은 후속 조치가 없으니 입원·전원이면 아직 바꿀 수 있다(귀가·사망·자의퇴원은 즉시 완료)
+        dto.setChangeable(EmgCodes.DISPOSITION_ADMIT.equals(entity.getDispositionTypeCode())
+                || EmgCodes.DISPOSITION_TRANSFER.equals(entity.getDispositionTypeCode()));
+        return dto;
     }
 
     @Override
     @Transactional
     public AdmissionRequestDto createAdmissionRequest(String dispositionId, AdmissionRequestCreateDto request) {
         Disposition disposition = findDisposition(dispositionId);
+        requireLatest(disposition);
         if (!EmgCodes.DISPOSITION_ADMIT.equals(disposition.getDispositionTypeCode())) {
             throw new IllegalArgumentException("admission request requires a disposition of type ADMIT");
         }
@@ -100,6 +119,7 @@ public class DispositionServiceImpl implements DispositionService {
     @Transactional
     public TransferNoteDto createTransferNote(String dispositionId, TransferNoteCreateDto request) {
         Disposition disposition = findDisposition(dispositionId);
+        requireLatest(disposition);
         if (!EmgCodes.DISPOSITION_TRANSFER.equals(disposition.getDispositionTypeCode())) {
             throw new IllegalArgumentException("transfer note requires a disposition of type TRANSFER");
         }
@@ -135,9 +155,14 @@ public class DispositionServiceImpl implements DispositionService {
         if (!StringUtils.hasText(receptionId)) {
             throw new IllegalArgumentException("receptionId is required");
         }
-        return dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream()
+        List<DispositionDto> result = dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream()
                 .map(this::toDispositionDto)
                 .collect(Collectors.toList());
+        // 바꿀 수 있는 건 최신 결정뿐(이전 결정은 이력)
+        if (!result.isEmpty()) {
+            result.get(0).setChangeable(dischargeProgress.stage(receptionId) == DischargeProgress.Stage.OPEN);
+        }
+        return result;
     }
 
     private Set<String> validDispositionTypes() {
@@ -243,6 +268,19 @@ public class DispositionServiceImpl implements DispositionService {
         dto.setWrittenById(saved.getWrittenById());
         dto.setWrittenAt(saved.getWrittenAt());
         return dto;
+    }
+
+    private java.util.Optional<Disposition> latestDisposition(String receptionId) {
+        return dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream().findFirst();
+    }
+
+    /** 결정을 바꾼 뒤에는 이전 결정에 입원요청·전원 소견서를 붙일 수 없다 */
+    private void requireLatest(Disposition disposition) {
+        boolean latest = latestDisposition(disposition.getReceptionId())
+                .map(d -> d.getId().equals(disposition.getId())).orElse(true);
+        if (!latest) {
+            throw new ConflictException("disposition has been replaced by a newer decision: " + disposition.getId());
+        }
     }
 
     private Disposition findDisposition(String id) {
