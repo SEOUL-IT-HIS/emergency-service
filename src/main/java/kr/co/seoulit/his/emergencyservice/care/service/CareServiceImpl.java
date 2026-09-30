@@ -5,6 +5,8 @@ import kr.co.seoulit.his.emergencyservice.care.entity.*;
 import kr.co.seoulit.his.emergencyservice.care.mapper.CareMapstructMapper;
 import kr.co.seoulit.his.emergencyservice.care.repository.*;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.patient.client.PatientClient;
 import kr.co.seoulit.his.emergencyservice.patient.dto.PatientDto;
@@ -33,10 +35,6 @@ public class CareServiceImpl implements CareService {
     private static final String ARRIVAL_PATH_GROUP_CODE = "VISIT_FORM_CD";
     private static final Set<String> ARRIVAL_PATH_FALLBACK = Set.of("01", "02", "03", "04");
 
-    // 진료기록 노트 종류 — 초진/재평가/처치/퇴실요약. EMG 내부 전용 분류라 admin 공통코드로 안 뺌.
-    private static final Set<String> VALID_NOTE_TYPES =
-            Set.of("INITIAL", "REASSESSMENT", "PROCEDURE", "DISCHARGE_SUMMARY");
-
     private final ClinicalNoteRepository clinicalNoteRepository;
     private final TreatmentRecordRepository treatmentRecordRepository;
     private final MedicationAdministrationRepository medicationAdministrationRepository;
@@ -45,6 +43,7 @@ public class CareServiceImpl implements CareService {
     private final BedAssignmentRepository bedAssignmentRepository;
     private final ReceptionIntakeRepository receptionIntakeRepository;
     private final CommonCodeCache commonCodeCache;
+    private final CommonCodeResolver codeResolver;
     private final CareMapstructMapper careMapper;
     private final PatientClient patientClient;
 
@@ -133,10 +132,9 @@ public class CareServiceImpl implements CareService {
                 || !StringUtils.hasText(request.getNoteTypeCode())) {
             throw new IllegalArgumentException("encounterId, noteTypeCode, content, recordedById are required");
         }
-        if (!VALID_NOTE_TYPES.contains(request.getNoteTypeCode())) {
-            throw new IllegalArgumentException(
-                    "noteTypeCode must be one of " + String.join(", ", VALID_NOTE_TYPES));
-        }
+        // 진료기록 종류: admin NOTE_TYPE_CD(초진/재평가/처치/퇴실요약), 그룹이 없으면 폴백
+        codeResolver.require("noteTypeCode", request.getNoteTypeCode(),
+                codeResolver.valueSet(EmgCodes.NOTE_TYPE_GROUP, EmgCodes.NOTE_TYPE_FALLBACK));
         ClinicalNote entity = new ClinicalNote();
         entity.setReceptionId(request.getEncounterId());
         entity.setNoteTypeCode(request.getNoteTypeCode());
@@ -158,6 +156,8 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException(
                     "encounterId, orderId, treatmentCode, performedById are required");
         }
+        codeResolver.require("treatmentCode", request.getTreatmentCode(),
+                codeResolver.valueSet(EmgCodes.TREATMENT_TYPE_GROUP, EmgCodes.TREATMENT_TYPE_FALLBACK));
         TreatmentRecord entity = new TreatmentRecord();
         entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
@@ -180,6 +180,9 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException(
                     "encounterId, orderId, administeredAt, dose, drugCode, routeCode, administeredById are required");
         }
+        // 투여경로는 admin 기존 그룹 ADMIN_ROUTE_CD(01 PO, 02 IV ...) — 그룹이 없으면 폴백
+        codeResolver.require("routeCode", request.getRouteCode(),
+                codeResolver.valueSet(EmgCodes.ADMIN_ROUTE_GROUP, EmgCodes.ADMIN_ROUTE_FALLBACK));
         MedicationAdministration entity = new MedicationAdministration();
         entity.setReceptionId(request.getEncounterId());
         entity.setOrderId(request.getOrderId());
@@ -201,6 +204,12 @@ public class CareServiceImpl implements CareService {
                 || request.getEvents() == null || request.getEvents().isEmpty()) {
             throw new IllegalArgumentException("encounterId and events[] are required");
         }
+        if (StringUtils.hasText(request.getOutcomeCode())) {
+            codeResolver.require("outcomeCode", request.getOutcomeCode(),
+                    codeResolver.valueSet(EmgCodes.CPR_OUTCOME_GROUP, EmgCodes.CPR_OUTCOME_FALLBACK));
+        }
+        Set<String> validEventTypes =
+                codeResolver.valueSet(EmgCodes.CPR_EVENT_TYPE_GROUP, EmgCodes.CPR_EVENT_TYPE_FALLBACK);
         CprEvent event = new CprEvent();
         event.setReceptionId(request.getEncounterId());
         event.setStartedAt(LocalDateTime.now());
@@ -212,6 +221,7 @@ public class CareServiceImpl implements CareService {
             if (!StringUtils.hasText(item.getEventTypeCode()) || !StringUtils.hasText(item.getRecordedById())) {
                 throw new IllegalArgumentException("each event requires eventTypeCode and recordedById");
             }
+            codeResolver.require("eventTypeCode", item.getEventTypeCode(), validEventTypes);
             CprTimeline timeline = new CprTimeline();
             timeline.setCprEvent(event);
             timeline.setEventAt(item.getEventAt() != null ? item.getEventAt() : LocalDateTime.now());
@@ -223,23 +233,59 @@ public class CareServiceImpl implements CareService {
             event.getTimelines().add(timeline);
         }
 
-        CprEvent saved = cprEventRepository.save(event);
+        return toCprDto(cprEventRepository.save(event));
+    }
+
+    private CprEventDto toCprDto(CprEvent saved) {
         CprEventDto dto = new CprEventDto();
         dto.setId(saved.getId());
         dto.setReceptionId(saved.getReceptionId());
         dto.setStartedAt(saved.getStartedAt());
         dto.setEndedAt(saved.getEndedAt());
         dto.setOutcomeCode(saved.getOutcomeCode());
-        dto.setTimelines(saved.getTimelines().stream().map(t -> {
-            CprEventDto.CprTimelineItemDto item = new CprEventDto.CprTimelineItemDto();
-            item.setId(t.getId());
-            item.setEventAt(t.getEventAt());
-            item.setEventTypeCode(t.getEventTypeCode());
-            item.setDetail(t.getDetail());
-            item.setRecordedById(t.getRecordedById());
-            return item;
-        }).collect(Collectors.toList()));
+        dto.setTimelines(saved.getTimelines().stream()
+                .sorted(java.util.Comparator.comparing(CprTimeline::getEventAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .map(tl -> {
+                    CprEventDto.CprTimelineItemDto item = new CprEventDto.CprTimelineItemDto();
+                    item.setId(tl.getId());
+                    item.setEventAt(tl.getEventAt());
+                    item.setEventTypeCode(tl.getEventTypeCode());
+                    item.setDetail(tl.getDetail());
+                    item.setRecordedById(tl.getRecordedById());
+                    return item;
+                }).collect(Collectors.toList()));
         return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TreatmentRecordDto> getTreatments(String receptionId) {
+        requireReceptionId(receptionId);
+        return treatmentRecordRepository.findByReceptionIdOrderByPerformedAtAsc(receptionId).stream()
+                .map(careMapper::toTreatmentDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MarDto> getMars(String receptionId) {
+        requireReceptionId(receptionId);
+        return medicationAdministrationRepository.findByReceptionIdOrderByAdministeredAtAsc(receptionId).stream()
+                .map(careMapper::toMarDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CprEventDto> getCprEvents(String receptionId) {
+        requireReceptionId(receptionId);
+        return cprEventRepository.findByReceptionIdOrderByStartedAtDesc(receptionId).stream()
+                .map(this::toCprDto).collect(Collectors.toList());
+    }
+
+    private void requireReceptionId(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
+        }
     }
 
     @Override

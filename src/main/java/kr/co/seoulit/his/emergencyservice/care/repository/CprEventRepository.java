@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface CprEventRepository extends JpaRepository<CprEvent, String> {
     List<CprEvent> findByReceptionId(String receptionId);
+    List<CprEvent> findByReceptionIdOrderByStartedAtDesc(String receptionId);
 }

@@ -38,16 +38,34 @@ public class CareController {
         return ApiResponse.success(careService.createRecord(request));
     }
 
+    @Operation(summary = "응급 처치 기록 목록 조회", description = "UC-CARE-03 · 접수 건별 처치기록(시행 시각 순)")
+    @GetMapping("/treatments")
+    public ApiResponse<List<TreatmentRecordDto>> getTreatments(@RequestParam String receptionId) {
+        return ApiResponse.success(careService.getTreatments(receptionId));
+    }
+
     @Operation(summary = "응급 처치 기록", description = "UC-CARE-03 · 처치기록(orderId=GR2 참조 권장)")
     @PostMapping("/treatments")
     public ApiResponse<TreatmentRecordDto> createTreatment(@RequestBody TreatmentCreateRequestDto request) {
         return ApiResponse.success(careService.createTreatment(request));
     }
 
+    @Operation(summary = "약물 투여 기록(MAR) 목록 조회", description = "UC-CARE-04 · 접수 건별 투여기록(투여 시각 순)")
+    @GetMapping("/medication-administrations")
+    public ApiResponse<List<MarDto>> getMars(@RequestParam String receptionId) {
+        return ApiResponse.success(careService.getMars(receptionId));
+    }
+
     @Operation(summary = "약물 투여 기록(MAR)", description = "UC-CARE-04 · 투여기록. 처방자장은 GR2, orderId 필수 권장")
     @PostMapping("/medication-administrations")
     public ApiResponse<MarDto> createMar(@RequestBody MarCreateRequestDto request) {
         return ApiResponse.success(careService.createMar(request));
+    }
+
+    @Operation(summary = "CPR 타임라인 목록 조회", description = "UC-CARE-05 · 접수 건별 CPR 기록(최신 시작 순, 타임라인은 이벤트 시각 순)")
+    @GetMapping("/cpr-timelines")
+    public ApiResponse<List<CprEventDto>> getCprEvents(@RequestParam String receptionId) {
+        return ApiResponse.success(careService.getCprEvents(receptionId));
     }
 
     @Operation(summary = "CPR 타임라인 기록", description = "UC-CARE-05 · 심폐소생술 이벤트 타임라인")
