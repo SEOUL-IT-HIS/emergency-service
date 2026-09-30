@@ -33,9 +33,9 @@ public class CareServiceImpl implements CareService {
     private static final String ARRIVAL_PATH_GROUP_CODE = "VISIT_FORM_CD";
     private static final Set<String> ARRIVAL_PATH_FALLBACK = Set.of("01", "02", "03", "04");
 
-    // 진료기록 노트 종류 — 초진/재평가/처치/컨설트회신/퇴실요약. EMG 내부 전용 분류라 admin 공통코드로 안 뺌.
+    // 진료기록 노트 종류 — 초진/재평가/처치/퇴실요약. EMG 내부 전용 분류라 admin 공통코드로 안 뺌.
     private static final Set<String> VALID_NOTE_TYPES =
-            Set.of("INITIAL", "REASSESSMENT", "PROCEDURE", "CONSULT_REPLY", "DISCHARGE_SUMMARY");
+            Set.of("INITIAL", "REASSESSMENT", "PROCEDURE", "DISCHARGE_SUMMARY");
 
     private final ClinicalNoteRepository clinicalNoteRepository;
     private final TreatmentRecordRepository treatmentRecordRepository;

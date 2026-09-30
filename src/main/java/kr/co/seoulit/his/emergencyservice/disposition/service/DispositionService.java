@@ -9,5 +9,4 @@ public interface DispositionService {
     List<DispositionDto> getDispositions(String receptionId);
     AdmissionRequestDto createAdmissionRequest(String dispositionId, AdmissionRequestCreateDto request);
     TransferNoteDto createTransferNote(String dispositionId, TransferNoteCreateDto request);
-    AmbulanceTransportDto createAmbulanceTransport(String dispositionId, AmbulanceTransportCreateDto request);
 }

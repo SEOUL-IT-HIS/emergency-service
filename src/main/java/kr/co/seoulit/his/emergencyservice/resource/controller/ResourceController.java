@@ -45,11 +45,4 @@ public class ResourceController {
             @RequestBody BedReleaseRequestDto request) {
         return ApiResponse.success(resourceService.releaseBed(assignmentId, request));
     }
-
-    @Operation(summary = "응급 의료기기 할당", description = "UC-RES-03 · 기기 배당")
-    @PostMapping("/equipment-assignments")
-    public ApiResponse<EquipmentAllocationDto> assignEquipment(
-            @RequestBody EquipmentAssignmentCreateRequestDto request) {
-        return ApiResponse.success(resourceService.assignEquipment(request));
-    }
 }

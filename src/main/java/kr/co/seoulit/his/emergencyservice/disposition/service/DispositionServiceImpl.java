@@ -27,7 +27,6 @@ public class DispositionServiceImpl implements DispositionService {
     private final DispositionRepository dispositionRepository;
     private final AdmissionRequestRepository admissionRequestRepository;
     private final TransferNoteRepository transferNoteRepository;
-    private final AmbulanceTransportRepository ambulanceTransportRepository;
     private final CommonCodeCache commonCodeCache;
 
     @Override
@@ -94,32 +93,6 @@ public class DispositionServiceImpl implements DispositionService {
         dto.setContent(saved.getContent());
         dto.setWrittenById(saved.getWrittenById());
         dto.setWrittenAt(saved.getWrittenAt());
-        return dto;
-    }
-
-    @Override
-    @Transactional
-    public AmbulanceTransportDto createAmbulanceTransport(String dispositionId, AmbulanceTransportCreateDto request) {
-        Disposition disposition = findDisposition(dispositionId);
-        AmbulanceTransport entity = new AmbulanceTransport();
-        entity.setDisposition(disposition);
-        entity.setAmbulanceNo(request.getAmbulanceNo());
-        entity.setTransportTypeCode(request.getTransportTypeCode());
-        entity.setDepartedAt(request.getDepartedAt());
-        entity.setArrivedAt(request.getArrivedAt());
-        entity.setAccompanyingStaffId(request.getAccompanyingStaffId());
-        entity.setCreatedAt(LocalDateTime.now());
-        entity.setUpdatedAt(LocalDateTime.now());
-        AmbulanceTransport saved = ambulanceTransportRepository.save(entity);
-
-        AmbulanceTransportDto dto = new AmbulanceTransportDto();
-        dto.setId(saved.getId());
-        dto.setDispositionId(disposition.getId());
-        dto.setAmbulanceNo(saved.getAmbulanceNo());
-        dto.setTransportTypeCode(saved.getTransportTypeCode());
-        dto.setDepartedAt(saved.getDepartedAt());
-        dto.setArrivedAt(saved.getArrivedAt());
-        dto.setAccompanyingStaffId(saved.getAccompanyingStaffId());
         return dto;
     }
 

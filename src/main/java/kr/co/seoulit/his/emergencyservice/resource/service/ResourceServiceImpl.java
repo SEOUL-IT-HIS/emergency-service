@@ -37,8 +37,6 @@ public class ResourceServiceImpl implements ResourceService {
 
     private final BedRepository bedRepository;
     private final BedAssignmentRepository bedAssignmentRepository;
-    private final EquipmentRepository equipmentRepository;
-    private final EquipmentAllocationRepository equipmentAllocationRepository;
     private final CommonCodeCache commonCodeCache;
 
     /**
@@ -223,39 +221,6 @@ public class ResourceServiceImpl implements ResourceService {
         dto.setAssignedAt(assignment.getAssignedAt());
         dto.setReleasedById(assignment.getReleasedById());
         dto.setReleasedAt(assignment.getReleasedAt());
-        return dto;
-    }
-
-    @Override
-    @Transactional
-    public EquipmentAllocationDto assignEquipment(EquipmentAssignmentCreateRequestDto request) {
-        if (!StringUtils.hasText(request.getEncounterId()) || request.getEquipmentId() == null) {
-            throw new IllegalArgumentException("encounterId and equipmentId are required");
-        }
-        Equipment equipment = equipmentRepository.findById(request.getEquipmentId())
-                .orElseThrow(() -> ResourceNotFoundException.of("equipment", request.getEquipmentId()));
-        if ("IN_USE".equals(equipment.getEquipmentStatusCode())) {
-            throw new ConflictException("equipment already in use: " + request.getEquipmentId());
-        }
-        EquipmentAllocation allocation = new EquipmentAllocation();
-        allocation.setReceptionId(request.getEncounterId());
-        allocation.setEquipment(equipment);
-        allocation.setAllocatedById(request.getAllocatedById());
-        allocation.setAllocatedAt(LocalDateTime.now());
-        allocation.setCreatedAt(LocalDateTime.now());
-        allocation.setUpdatedAt(LocalDateTime.now());
-        EquipmentAllocation saved = equipmentAllocationRepository.save(allocation);
-
-        equipment.setEquipmentStatusCode("IN_USE");
-        equipment.setUpdatedAt(LocalDateTime.now());
-
-        EquipmentAllocationDto dto = new EquipmentAllocationDto();
-        dto.setId(saved.getId());
-        dto.setReceptionId(saved.getReceptionId());
-        dto.setEquipmentId(equipment.getId());
-        dto.setAssetNo(equipment.getAssetNo());
-        dto.setAllocatedById(saved.getAllocatedById());
-        dto.setAllocatedAt(saved.getAllocatedAt());
         return dto;
     }
 }

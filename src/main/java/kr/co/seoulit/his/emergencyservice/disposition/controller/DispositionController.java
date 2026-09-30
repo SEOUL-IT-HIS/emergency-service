@@ -45,12 +45,4 @@ public class DispositionController {
             @RequestBody TransferNoteCreateDto request) {
         return ApiResponse.success(dispositionService.createTransferNote(id, request));
     }
-
-    @Operation(summary = "구급차 이송 기록", description = "UC-DISP-04 · 이송 메타정보 (연계:EMS)")
-    @PostMapping("/{id}/ambulance-transport")
-    public ApiResponse<AmbulanceTransportDto> createAmbulanceTransport(
-            @PathVariable String id,
-            @RequestBody AmbulanceTransportCreateDto request) {
-        return ApiResponse.success(dispositionService.createAmbulanceTransport(id, request));
-    }
 }

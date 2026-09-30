@@ -24,8 +24,6 @@ class ResourceServiceImplCongestionTest {
         service = new ResourceServiceImpl(
                 bedRepository,
                 mock(BedAssignmentRepository.class),
-                mock(EquipmentRepository.class),
-                mock(EquipmentAllocationRepository.class),
                 new CommonCodeCache());
     }
 
