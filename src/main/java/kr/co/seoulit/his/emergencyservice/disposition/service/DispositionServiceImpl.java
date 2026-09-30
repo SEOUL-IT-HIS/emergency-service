@@ -168,16 +168,27 @@ public class DispositionServiceImpl implements DispositionService {
 
     @Override
     @Transactional
-    public AdmissionRequestDto updateAdmissionStatus(String dispositionId, String statusCode) {
+    public AdmissionRequestDto updateAdmissionStatus(String dispositionId, String admissionRequestId, String statusCode,
+                                                     String wardCode) {
         requireId(dispositionId);
         codeResolver.require("requestStatusCode", statusCode,
                 codeResolver.valueSet(EmgCodes.ADMISSION_STATUS_GROUP, EmgCodes.ADMISSION_STATUS_FALLBACK));
-        // 가장 최근 요청(진행 중인 것)에 병동 회신을 반영한다
-        AdmissionRequest latest = admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc(dispositionId).stream()
-                .findFirst().orElseThrow(() -> ResourceNotFoundException.of("admissionRequest", dispositionId));
-        latest.setRequestStatusCode(statusCode);
-        latest.setUpdatedAt(LocalDateTime.now());
-        return toAdmissionDto(latest);
+        // 회신이 가리키는 요청(admissionRequestId)에, 없으면 가장 최근 요청에 반영한다
+        List<AdmissionRequest> requests = admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc(dispositionId);
+        AdmissionRequest target = (admissionRequestId == null
+                ? requests.stream().findFirst()
+                : requests.stream().filter(a -> admissionRequestId.equals(a.getId())).findFirst())
+                .orElseThrow(() -> ResourceNotFoundException.of("admissionRequest", dispositionId));
+        // 처음 회신만 반영한다: 이미 배정/거부된 요청은 뒤늦은 회신(중복·재전송)으로 덮어쓰지 않는다
+        if (!EmgCodes.ADMISSION_REQUESTED.equals(target.getRequestStatusCode())) {
+            return toAdmissionDto(target);
+        }
+        target.setRequestStatusCode(statusCode);
+        if (EmgCodes.ADMISSION_BED_ASSIGNED.equals(statusCode)) {
+            target.setAssignedWardCode(wardCode);
+        }
+        target.setUpdatedAt(LocalDateTime.now());
+        return toAdmissionDto(target);
     }
 
     @Override
@@ -198,6 +209,7 @@ public class DispositionServiceImpl implements DispositionService {
         AdmissionRequestDto dto = new AdmissionRequestDto();
         dto.setId(saved.getId());
         dto.setDispositionId(saved.getDisposition().getId());
+        dto.setAssignedWardCode(saved.getAssignedWardCode());
         dto.setTargetDeptCode(saved.getTargetDeptCode());
         dto.setRequestStatusCode(saved.getRequestStatusCode());
         dto.setRequestedAt(saved.getRequestedAt());

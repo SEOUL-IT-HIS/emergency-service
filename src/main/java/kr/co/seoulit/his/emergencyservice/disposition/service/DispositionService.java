@@ -10,7 +10,7 @@ public interface DispositionService {
     AdmissionRequestDto createAdmissionRequest(String dispositionId, AdmissionRequestCreateDto request);
     List<AdmissionRequestDto> getAdmissionRequests(String dispositionId);
     /** 병동 회신(Kafka)으로 입원요청 상태를 바꾼다. REST 로 열지 않는다(개발표준 21.3). */
-    AdmissionRequestDto updateAdmissionStatus(String dispositionId, String statusCode);
+    AdmissionRequestDto updateAdmissionStatus(String dispositionId, String admissionRequestId, String statusCode, String wardCode);
     TransferNoteDto createTransferNote(String dispositionId, TransferNoteCreateDto request);
     List<TransferNoteDto> getTransferNotes(String dispositionId);
 }

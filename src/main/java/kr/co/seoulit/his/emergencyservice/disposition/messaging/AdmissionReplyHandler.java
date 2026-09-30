@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
 /**
  * 병동 회신(BED_ASSIGNED / ADMISSION_REJECTED)을 입원요청 상태로 반영한다.
  * 회신 JSON 은 {dispositionId, ...}. 이 클래스는 Kafka 없이도 단위 테스트할 수 있게 리스너와 분리했다.
- * 응급은 병동 병상 정보(wardCode, bedId)를 저장하지 않고 상태만 반영한다(병동 소유 데이터).
+ * 병동팀 합의(2026-09-30): 처음 배정 회신만 반영한다(병상 변경·배정 취소·입원요청 취소 이벤트는 없다).
+ * 화면의 병동은 희망 병동이 아니라 BED_ASSIGNED 회신의 wardCode 로 보여준다(다른 병동으로 배정될 수 있음).
+ * 병상 번호(bedId)는 병동 소유 데이터라 저장하지 않는다.
  */
 @Slf4j
 @Component
@@ -31,7 +33,11 @@ public class AdmissionReplyHandler {
                 return;
             }
             String status = bedAssigned ? EmgCodes.ADMISSION_BED_ASSIGNED : EmgCodes.ADMISSION_REJECTED;
-            dispositionService.updateAdmissionStatus(dispositionId, status);
+            // admissionRequestId 는 선택: 있으면 그 요청에, 없으면 가장 최근 요청에 반영한다
+            String requestId = node.path("admissionRequestId").asText("");
+            String wardCode = bedAssigned ? node.path("wardCode").asText("") : "";
+            dispositionService.updateAdmissionStatus(dispositionId, requestId.isBlank() ? null : requestId, status,
+                    wardCode.isBlank() ? null : wardCode);
             log.info("병동 회신 반영 dispositionId={} status={}", dispositionId, status);
         } catch (Exception e) {
             // 잘못된 메시지 하나가 리스너를 멈추지 않게 로그만 남긴다

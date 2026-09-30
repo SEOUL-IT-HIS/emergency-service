@@ -48,7 +48,7 @@ public class KafkaAdmissionEventPublisher implements AdmissionEventPublisher {
         boolean isolation = isolationAssessmentRepository.findByReceptionId(receptionId).stream()
                 .anyMatch(a -> a.getReleasedAt() == null && "Y".equals(a.getRequiredYn()));
         AdmissionRequestedEvent event = new AdmissionRequestedEvent(
-                disposition.getId(), receptionId, patientId, request.getTargetDeptCode(), wardPref,
+                disposition.getId(), request.getId(), receptionId, patientId, request.getTargetDeptCode(), wardPref,
                 isolation ? "Y" : "N", disposition.getDecidedById(),
                 request.getRequestedAt().format(REQUESTED_AT_FORMAT), StringUtils.hasText(note) ? note : null);
         try {

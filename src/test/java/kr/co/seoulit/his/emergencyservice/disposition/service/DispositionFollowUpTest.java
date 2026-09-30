@@ -102,12 +102,32 @@ class DispositionFollowUpTest {
         when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-admit"))
                 .thenReturn(List.of(latest));
 
-        AdmissionRequestDto dto = service.updateAdmissionStatus("d-admit", EmgCodes.ADMISSION_BED_ASSIGNED);
+        AdmissionRequestDto dto = service.updateAdmissionStatus("d-admit", null, EmgCodes.ADMISSION_BED_ASSIGNED, "03");
 
         assertThat(dto.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
+        assertThat(dto.getAssignedWardCode()).isEqualTo("03");
         assertThat(latest.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
-        assertThatThrownBy(() -> service.updateAdmissionStatus("d-admit", "99"))
+        assertThatThrownBy(() -> service.updateAdmissionStatus("d-admit", null, "99", null))
                 .hasMessageContaining("requestStatusCode");
+        // 처음 회신만 반영: 뒤늦은 거부 회신이 배정 완료를 덮어쓰지 않는다
+        service.updateAdmissionStatus("d-admit", null, EmgCodes.ADMISSION_REJECTED, null);
+        assertThat(latest.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
+    }
+
+    @Test
+    void replyIsMatchedToTheRequestItNamesEvenAfterAReRequest() {
+        Disposition d = disposition("d-re", EmgCodes.DISPOSITION_ADMIT);
+        AdmissionRequest oldRejected = request(d, EmgCodes.ADMISSION_REJECTED);
+        oldRejected.setId("ar-old");
+        AdmissionRequest fresh = request(d, EmgCodes.ADMISSION_REQUESTED);
+        fresh.setId("ar-new");
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-re")).thenReturn(List.of(fresh, oldRejected));
+
+        // 옛 요청(ar-old)에 대한 늦은 회신은 새 요청을 건드리지 않는다
+        service.updateAdmissionStatus("d-re", "ar-old", EmgCodes.ADMISSION_REJECTED, null);
+        assertThat(fresh.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_REQUESTED);
+        service.updateAdmissionStatus("d-re", "ar-new", EmgCodes.ADMISSION_BED_ASSIGNED, "03");
+        assertThat(fresh.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
     }
 
     @Test

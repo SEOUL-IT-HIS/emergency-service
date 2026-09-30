@@ -27,25 +27,31 @@ class AdmissionReplyHandlerTest {
     @Test
     void bedAssignedReplyMarksTheRequestAsBedAssigned() {
         handler.handle("{\"dispositionId\":\"d-1\",\"wardCode\":\"06\",\"bedId\":\"b-9\"}", true);
-        verify(dispositionService).updateAdmissionStatus("d-1", EmgCodes.ADMISSION_BED_ASSIGNED);
+        verify(dispositionService).updateAdmissionStatus("d-1", null, EmgCodes.ADMISSION_BED_ASSIGNED, "06");
     }
 
     @Test
     void rejectedReplyMarksTheRequestAsRejected() {
         handler.handle("{\"dispositionId\":\"d-2\",\"rejectReason\":\"no bed\"}", false);
-        verify(dispositionService).updateAdmissionStatus("d-2", EmgCodes.ADMISSION_REJECTED);
+        verify(dispositionService).updateAdmissionStatus("d-2", null, EmgCodes.ADMISSION_REJECTED, null);
+    }
+
+    @Test
+    void replyCarriesTheRequestIdWhenTheWardEchoesIt() {
+        handler.handle("{\"dispositionId\":\"d-3\",\"admissionRequestId\":\"ar-9\",\"wardCode\":\"03\"}", true);
+        verify(dispositionService).updateAdmissionStatus("d-3", "ar-9", EmgCodes.ADMISSION_BED_ASSIGNED, "03");
     }
 
     @Test
     void malformedOrIncompleteMessagesAreIgnoredWithoutThrowing() {
         handler.handle("not json", true);
         handler.handle("{\"wardCode\":\"06\"}", true);
-        verify(dispositionService, never()).updateAdmissionStatus(anyString(), anyString());
+        verify(dispositionService, never()).updateAdmissionStatus(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
     void anUnknownDispositionDoesNotStopTheListener() {
-        when(dispositionService.updateAdmissionStatus("d-x", EmgCodes.ADMISSION_BED_ASSIGNED))
+        when(dispositionService.updateAdmissionStatus("d-x", null, EmgCodes.ADMISSION_BED_ASSIGNED, null))
                 .thenThrow(new RuntimeException("not found"));
         handler.handle("{\"dispositionId\":\"d-x\"}", true);
     }
