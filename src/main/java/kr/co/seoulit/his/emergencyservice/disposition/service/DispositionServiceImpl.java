@@ -1,6 +1,8 @@
 package kr.co.seoulit.his.emergencyservice.disposition.service;
 
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.*;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.*;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.*;
@@ -10,21 +12,33 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class DispositionServiceImpl implements DispositionService {
 
+    // 코드그룹 DISPOSITION_TYPE (docs/models.md). admin 캐시에 없으면 폴백 사용
+    private static final String DISPOSITION_TYPE_GROUP_CODE = "DISPOSITION_TYPE";
+    private static final Set<String> DISPOSITION_TYPE_FALLBACK = Set.of("HOME", "ADMIT", "TRANSFER", "DEATH", "DAMA");
+
     private final DispositionRepository dispositionRepository;
     private final AdmissionRequestRepository admissionRequestRepository;
     private final TransferNoteRepository transferNoteRepository;
     private final AmbulanceTransportRepository ambulanceTransportRepository;
+    private final CommonCodeCache commonCodeCache;
 
     @Override
     @Transactional
     public DispositionDto createDisposition(DispositionCreateRequestDto request) {
         if (!StringUtils.hasText(request.getEncounterId()) || !StringUtils.hasText(request.getDispositionType())) {
             throw new IllegalArgumentException("encounterId and dispositionType are required");
+        }
+        Set<String> validTypes = validDispositionTypes();
+        if (!validTypes.contains(request.getDispositionType())) {
+            throw new IllegalArgumentException("dispositionType must be one of " + String.join(", ", validTypes));
         }
         Disposition entity = new Disposition();
         entity.setReceptionId(request.getEncounterId());
@@ -107,6 +121,28 @@ public class DispositionServiceImpl implements DispositionService {
         dto.setArrivedAt(saved.getArrivedAt());
         dto.setAccompanyingStaffId(saved.getAccompanyingStaffId());
         return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DispositionDto> getDispositions(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
+        }
+        return dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream()
+                .map(this::toDispositionDto)
+                .collect(Collectors.toList());
+    }
+
+    private Set<String> validDispositionTypes() {
+        List<AdminCommonCodeItemDto> codes = commonCodeCache.get(DISPOSITION_TYPE_GROUP_CODE);
+        if (codes.isEmpty()) {
+            return DISPOSITION_TYPE_FALLBACK;
+        }
+        return codes.stream()
+                .filter(code -> !"N".equals(code.getUseYn()))
+                .map(AdminCommonCodeItemDto::getCodeValue)
+                .collect(Collectors.toSet());
     }
 
     private Disposition findDisposition(String id) {

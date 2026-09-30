@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +37,13 @@ public class EmergencyExceptionHandler {
     public ApiResponse<Void> handleUnreadableBody(HttpMessageNotReadableException exception) {
         // 요청 본문(JSON)을 해석할 수 없습니다.
         return ApiResponse.error("EMG_BAD_REQUEST", "Unable to parse the request body (JSON).");
+    }
+
+    // 필수 쿼리 파라미터 누락(예: GET /dispositions 에 receptionId 없음) — 없으면 500으로 떨어짐
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingParameter(MissingServletRequestParameterException exception) {
+        return ApiResponse.error("EMG_BAD_REQUEST", exception.getParameterName() + " is required");
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

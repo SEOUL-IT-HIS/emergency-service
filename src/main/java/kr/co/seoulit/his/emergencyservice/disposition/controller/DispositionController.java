@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "ER-DISPOSITION 이송/퇴원처리", description = "이송·귀가·입원 결정, 입원요청, 전원 소견서, 구급차 이송기록 (Provider=EMG)")
 @RestController
 @RequestMapping("/api/emergency/dispositions")
@@ -20,6 +22,12 @@ public class DispositionController {
     @PostMapping
     public ApiResponse<DispositionDto> createDisposition(@RequestBody DispositionCreateRequestDto request) {
         return ApiResponse.success(dispositionService.createDisposition(request));
+    }
+
+    @Operation(summary = "접수 건별 퇴실 결정 조회", description = "UC-DISP-01 · 최신 결정이 맨 앞 (decidedAt 내림차순)")
+    @GetMapping
+    public ApiResponse<List<DispositionDto>> getDispositions(@RequestParam String receptionId) {
+        return ApiResponse.success(dispositionService.getDispositions(receptionId));
     }
 
     @Operation(summary = "응급 입원 요청", description = "UC-DISP-02 · 병동 입원 요청 (연계:IPT)")
