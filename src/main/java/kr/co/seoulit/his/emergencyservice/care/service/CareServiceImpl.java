@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.care.dto.*;
 import kr.co.seoulit.his.emergencyservice.care.entity.*;
 import kr.co.seoulit.his.emergencyservice.care.mapper.CareMapstructMapper;
 import kr.co.seoulit.his.emergencyservice.care.repository.*;
+import kr.co.seoulit.his.emergencyservice.common.util.InChunks;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
@@ -57,7 +58,19 @@ public class CareServiceImpl implements CareService {
     @Transactional(readOnly = true)
     public List<EmergencyPatientDto> getPatients(String date, String status) {
         // 순회 기준 = ReceptionIntake(접수). 접수만 되어있으면 KTAS 전이라도 목록에 뜬다.
-        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
+        // 날짜·상태 조건을 먼저 걸러서, 아래 조회들이 화면에 나갈 접수만 대상으로 하게 한다.
+        LocalDate filterDate = StringUtils.hasText(date) ? LocalDate.parse(date) : null;
+        List<ReceptionIntake> dated = receptionIntakeRepository.findAll().stream()
+                .filter(intake -> filterDate == null || (intake.getReceivedAt() != null
+                        && intake.getReceivedAt().toLocalDate().equals(filterDate)))
+                .toList();
+        // 퇴실 처리 완료 기준은 DischargeProgress 하나로 통일(현황판·장기체류 알림과 같은 기준)
+        Set<String> doneReceptionIds = dischargeProgress.doneReceptionIds(
+                dated.stream().map(ReceptionIntake::getId).toList());
+        List<ReceptionIntake> intakes = dated.stream()
+                .filter(intake -> !StringUtils.hasText(status) || status.equals(careStatus(intake, doneReceptionIds)))
+                .toList();
+        List<String> receptionIds = intakes.stream().map(ReceptionIntake::getId).toList();
 
         // 환자명은 더 이상 접수 데이터에 저장하지 않고, PAT 배치조회로 채운다.
         // N번 개별 호출하지 않도록 patientId를 모아서 한 번만 호출한다.
@@ -80,46 +93,46 @@ public class CareServiceImpl implements CareService {
             patientNames = Collections.emptyMap(); // Map.of() 는 get(null)(patientId 없는 접수)에서 예외가 나므로 쓰지 않는다
         }
         final Map<String, String> names = patientNames;
-        // 퇴실 처리 완료 기준은 DischargeProgress 하나로 통일(현황판·장기체류 알림과 같은 기준)
-        Set<String> doneReceptionIds = dischargeProgress.doneReceptionIds(
-                intakes.stream().map(ReceptionIntake::getId).collect(Collectors.toList()));
+
+        // KTAS 이력·현재 병상은 접수마다 따로 조회하지 않고(N+1) 한 번에 가져와 접수ID로 묶는다.
+        // 예전엔 환자 N명이면 쿼리가 2N번 이상(병상은 LAZY 라 배정마다 한 번 더) 나갔다.
+        Map<String, List<TriageAssessment>> triageByReception = InChunks.query(receptionIds,
+                        triageAssessmentRepository::findByReceptionIdInOrderByAssessedAtAsc).stream()
+                .collect(Collectors.groupingBy(TriageAssessment::getReceptionId));
+        Map<String, BedAssignment> bedByReception = InChunks.query(receptionIds,
+                        bedAssignmentRepository::findActiveWithBedByReceptionIdIn).stream()
+                .collect(Collectors.toMap(BedAssignment::getReceptionId, assignment -> assignment, (a, b) -> a));
 
         return intakes.stream()
-                .filter(intake -> {
-                    if (!StringUtils.hasText(date)) {
-                        return true;
-                    }
-                    LocalDate filterDate = LocalDate.parse(date);
-                    return intake.getReceivedAt() != null
-                            && intake.getReceivedAt().toLocalDate().equals(filterDate);
-                })
                 .map(intake -> {
                     EmergencyPatientDto dto = new EmergencyPatientDto();
                     dto.setReceptionId(intake.getId());
                     dto.setPatientName(names.get(intake.getPatientId()));
                     dto.setReceivedAt(intake.getReceivedAt());
-                    dto.setCareStatusCode(doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE);
+                    dto.setCareStatusCode(careStatus(intake, doneReceptionIds));
                     dto.setMemo(intake.getMemo());
                     dto.setChiefComplaintRaw(intake.getChiefComplaintRaw());
 
-                    List<TriageAssessment> history =
-                            triageAssessmentRepository.findByReceptionIdOrderByAssessedAtAsc(intake.getId());
+                    // 오래된 순으로 가져왔으니 마지막이 최신 평가
+                    List<TriageAssessment> history = triageByReception.getOrDefault(intake.getId(), List.of());
                     if (!history.isEmpty()) {
                         TriageAssessment latest = history.get(history.size() - 1);
                         dto.setKtasLevelCode(latest.getKtasLevelCode());
                         dto.setLastAssessedAt(latest.getAssessedAt());
                     }
 
-                    List<BedAssignment> beds =
-                            bedAssignmentRepository.findByReceptionIdAndReleasedAtIsNull(intake.getId());
-                    if (!beds.isEmpty() && beds.get(0).getBed() != null) {
-                        dto.setBedNo(beds.get(0).getBed().getBedNo());
-                        dto.setZoneCode(beds.get(0).getBed().getZoneCode());
+                    BedAssignment assignment = bedByReception.get(intake.getId());
+                    if (assignment != null && assignment.getBed() != null) {
+                        dto.setBedNo(assignment.getBed().getBedNo());
+                        dto.setZoneCode(assignment.getBed().getZoneCode());
                     }
                     return dto;
                 })
-                .filter(dto -> !StringUtils.hasText(status) || status.equals(dto.getCareStatusCode()))
                 .collect(Collectors.toList());
+    }
+
+    private static String careStatus(ReceptionIntake intake, Set<String> doneReceptionIds) {
+        return doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE;
     }
 
     @Override

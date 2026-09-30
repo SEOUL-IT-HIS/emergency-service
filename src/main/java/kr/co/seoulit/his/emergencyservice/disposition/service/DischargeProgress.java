@@ -1,5 +1,6 @@
 package kr.co.seoulit.his.emergencyservice.disposition.service;
 
+import kr.co.seoulit.his.emergencyservice.common.util.InChunks;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.AdmissionRequest;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition;
@@ -43,7 +44,7 @@ public class DischargeProgress {
             return result;
         }
         Map<String, Disposition> latest = new HashMap<>();
-        for (Disposition d : dispositionRepository.findByReceptionIdIn(receptionIds)) {
+        for (Disposition d : InChunks.query(receptionIds, dispositionRepository::findByReceptionIdIn)) {
             Disposition cur = latest.get(d.getReceptionId());
             if (cur == null || isAfter(d.getDecidedAt(), cur.getDecidedAt())) {
                 latest.put(d.getReceptionId(), d);
@@ -55,13 +56,13 @@ public class DischargeProgress {
         List<String> dispositionIds = latest.values().stream().map(Disposition::getId).collect(Collectors.toList());
         // 입원요청은 가장 최근 요청의 상태로 본다
         Map<String, AdmissionRequest> latestRequest = new HashMap<>();
-        for (AdmissionRequest a : admissionRequestRepository.findByDispositionIdIn(dispositionIds)) {
+        for (AdmissionRequest a : InChunks.query(dispositionIds, admissionRequestRepository::findByDispositionIdIn)) {
             AdmissionRequest cur = latestRequest.get(a.getDisposition().getId());
             if (cur == null || isAfter(a.getRequestedAt(), cur.getRequestedAt())) {
                 latestRequest.put(a.getDisposition().getId(), a);
             }
         }
-        Set<String> withTransferNote = transferNoteRepository.findByDispositionIdIn(dispositionIds).stream()
+        Set<String> withTransferNote = InChunks.query(dispositionIds, transferNoteRepository::findByDispositionIdIn).stream()
                 .map(n -> n.getDisposition().getId()).collect(Collectors.toSet());
 
         latest.forEach((receptionId, d) -> {

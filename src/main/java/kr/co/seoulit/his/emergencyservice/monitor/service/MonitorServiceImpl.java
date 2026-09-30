@@ -82,12 +82,14 @@ public class MonitorServiceImpl implements MonitorService {
         LocalDateTime cutoff = now.minusMinutes(losThresholdMinutes);
         List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
         Set<String> disposed = doneReceptionIds(intakes);
+        // 이미 알린 접수는 한 번에 가져와 메모리에서 확인한다(접수마다 exists 조회 = N+1 방지)
+        Set<String> alreadyAlerted = new HashSet<>(losAlertRepository.findReceptionIdsByThresholdMinutes(losThresholdMinutes));
 
         int created = 0;
         for (ReceptionIntake intake : intakes) {
             if (intake.getReceivedAt() == null || intake.getReceivedAt().isAfter(cutoff)
                     || disposed.contains(intake.getId())
-                    || losAlertRepository.existsByReceptionIdAndThresholdMinutes(intake.getId(), losThresholdMinutes)) {
+                    || alreadyAlerted.contains(intake.getId())) {
                 continue;
             }
             LosAlert alert = new LosAlert();

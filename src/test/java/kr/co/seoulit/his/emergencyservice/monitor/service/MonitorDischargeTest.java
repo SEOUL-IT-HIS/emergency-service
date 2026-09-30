@@ -88,12 +88,28 @@ class MonitorDischargeTest {
         return a;
     }
 
+    private List<String> savedAlertReceptionIds() {
+        org.mockito.ArgumentCaptor<LosAlert> captor = org.mockito.ArgumentCaptor.forClass(LosAlert.class);
+        verify(losAlertRepository, atLeast(0)).save(captor.capture());
+        return captor.getAllValues().stream().map(LosAlert::getReceptionId).toList();
+    }
+
     @Test
     void patientWaitingForAWardBedIsStillInTheErAndGetsALongStayAlert() {
         service.detectLongStayPatients();
         // 결정 없음 + 병상 대기 → 알림 생성, 귀가(완료)는 제외
-        verify(losAlertRepository, times(2)).save(any(LosAlert.class));
-        verify(losAlertRepository, never()).existsByReceptionIdAndThresholdMinutes(eq("home"), anyInt());
+        assertThat(savedAlertReceptionIds()).containsExactlyInAnyOrder("none", "admit-wait");
+    }
+
+    @Test
+    void alreadyAlertedPatientsAreSkippedWithOneLookupInsteadOfOnePerPatient() {
+        when(losAlertRepository.findReceptionIdsByThresholdMinutes(anyInt())).thenReturn(List.of("none"));
+
+        service.detectLongStayPatients();
+
+        assertThat(savedAlertReceptionIds()).containsExactly("admit-wait");
+        // 이미 알린 접수 확인은 접수 수와 상관없이 한 번만 조회한다
+        verify(losAlertRepository, times(1)).findReceptionIdsByThresholdMinutes(anyInt());
     }
 
     @Test
