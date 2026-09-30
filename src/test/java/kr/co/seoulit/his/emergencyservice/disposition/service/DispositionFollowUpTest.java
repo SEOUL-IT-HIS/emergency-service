@@ -1,0 +1,129 @@
+package kr.co.seoulit.his.emergencyservice.disposition.service;
+
+import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.disposition.dto.AdmissionRequestCreateDto;
+import kr.co.seoulit.his.emergencyservice.disposition.dto.AdmissionRequestDto;
+import kr.co.seoulit.his.emergencyservice.disposition.dto.TransferNoteCreateDto;
+import kr.co.seoulit.his.emergencyservice.disposition.entity.AdmissionRequest;
+import kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository;
+import kr.co.seoulit.his.emergencyservice.disposition.messaging.AdmissionEventPublisher;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/** 입원요청·전원 소견서: 퇴실 유형 게이트, 중복 방지, 병동 회신 상태 반영 */
+class DispositionFollowUpTest {
+
+    private DispositionRepository dispositionRepository;
+    private AdmissionRequestRepository admissionRequestRepository;
+    private DispositionServiceImpl service;
+    private AdmissionEventPublisher publisher;
+
+    @BeforeEach
+    void setUp() {
+        dispositionRepository = mock(DispositionRepository.class);
+        admissionRequestRepository = mock(AdmissionRequestRepository.class);
+        when(admissionRequestRepository.save(any(AdmissionRequest.class))).thenAnswer(inv -> {
+            AdmissionRequest a = inv.getArgument(0);
+            a.setId("ar-new");
+            return a;
+        });
+        CommonCodeCache cache = new CommonCodeCache();
+        publisher = mock(AdmissionEventPublisher.class);
+        service = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
+                mock(TransferNoteRepository.class), cache, new CommonCodeResolver(cache), publisher);
+    }
+
+    private Disposition disposition(String id, String typeCode) {
+        Disposition d = new Disposition();
+        d.setId(id);
+        d.setDispositionTypeCode(typeCode);
+        when(dispositionRepository.findById(id)).thenReturn(Optional.of(d));
+        return d;
+    }
+
+    private AdmissionRequest request(Disposition d, String status) {
+        AdmissionRequest a = new AdmissionRequest();
+        a.setId("ar-1");
+        a.setDisposition(d);
+        a.setRequestStatusCode(status);
+        a.setRequestedAt(LocalDateTime.now());
+        return a;
+    }
+
+    @Test
+    void admissionRequestNeedsAnAdmitDispositionAndStartsAsRequested() {
+        disposition("d-home", EmgCodes.DISPOSITION_HOME);
+        assertThatThrownBy(() -> service.createAdmissionRequest("d-home", new AdmissionRequestCreateDto()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("ADMIT");
+
+        disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
+        AdmissionRequestCreateDto req = new AdmissionRequestCreateDto();
+        req.setWardPrefer("06");
+        AdmissionRequestDto dto = service.createAdmissionRequest("d-admit", req);
+        assertThat(dto.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_REQUESTED);
+        // 저장 뒤 병동으로 발행(희망 병동 전달)
+        org.mockito.Mockito.verify(publisher).publishRequested(any(Disposition.class), any(AdmissionRequest.class), org.mockito.ArgumentMatchers.eq("06"));
+    }
+
+    @Test
+    void duplicateRequestIsBlockedUntilTheEarlierOneIsRejected() {
+        Disposition d = disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-admit"))
+                .thenReturn(List.of(request(d, EmgCodes.ADMISSION_REQUESTED)));
+        assertThatThrownBy(() -> service.createAdmissionRequest("d-admit", new AdmissionRequestCreateDto()))
+                .isInstanceOf(ConflictException.class);
+
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-admit"))
+                .thenReturn(List.of(request(d, EmgCodes.ADMISSION_REJECTED)));
+        assertThat(service.createAdmissionRequest("d-admit", new AdmissionRequestCreateDto())).isNotNull();
+    }
+
+    @Test
+    void wardReplyUpdatesTheLatestRequestStatus() {
+        Disposition d = disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
+        AdmissionRequest latest = request(d, EmgCodes.ADMISSION_REQUESTED);
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-admit"))
+                .thenReturn(List.of(latest));
+
+        AdmissionRequestDto dto = service.updateAdmissionStatus("d-admit", EmgCodes.ADMISSION_BED_ASSIGNED);
+
+        assertThat(dto.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
+        assertThat(latest.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_BED_ASSIGNED);
+        assertThatThrownBy(() -> service.updateAdmissionStatus("d-admit", "99"))
+                .hasMessageContaining("requestStatusCode");
+    }
+
+    @Test
+    void transferNoteNeedsATransferDispositionAndValidFields() {
+        disposition("d-home", EmgCodes.DISPOSITION_HOME);
+        TransferNoteCreateDto r = new TransferNoteCreateDto();
+        r.setTargetHospitalCode("01");
+        r.setContent("transfer summary");
+        r.setWrittenById("dr-1");
+        assertThatThrownBy(() -> service.createTransferNote("d-home", r))
+                .hasMessageContaining("TRANSFER");
+
+        disposition("d-tr", EmgCodes.DISPOSITION_TRANSFER);
+        r.setContent(" ");
+        assertThatThrownBy(() -> service.createTransferNote("d-tr", r)).hasMessageContaining("required");
+        r.setContent("transfer summary");
+        r.setTargetHospitalCode("99");
+        assertThatThrownBy(() -> service.createTransferNote("d-tr", r)).hasMessageContaining("targetHospitalCode");
+    }
+}

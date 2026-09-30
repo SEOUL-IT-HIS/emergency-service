@@ -4,4 +4,5 @@ import kr.co.seoulit.his.emergencyservice.disposition.entity.TransferNote;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TransferNoteRepository extends JpaRepository<TransferNote, String> {
+    java.util.List<TransferNote> findByDispositionIdOrderByWrittenAtDesc(String dispositionId);
 }

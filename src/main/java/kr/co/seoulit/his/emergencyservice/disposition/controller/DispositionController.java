@@ -38,6 +38,18 @@ public class DispositionController {
         return ApiResponse.success(dispositionService.createAdmissionRequest(id, request));
     }
 
+    @Operation(summary = "입원 요청 목록 조회", description = "UC-DISP-02 · 퇴실 결정별 입원요청 이력(최신이 첫 번째). 상태는 병동 회신(Kafka)으로 갱신")
+    @GetMapping("/{id}/admission-requests")
+    public ApiResponse<List<AdmissionRequestDto>> getAdmissionRequests(@PathVariable String id) {
+        return ApiResponse.success(dispositionService.getAdmissionRequests(id));
+    }
+
+    @Operation(summary = "전원 소견서 목록 조회", description = "UC-DISP-03 · 퇴실 결정별 전원 소견서(최신이 첫 번째)")
+    @GetMapping("/{id}/transfer-notes")
+    public ApiResponse<List<TransferNoteDto>> getTransferNotes(@PathVariable String id) {
+        return ApiResponse.success(dispositionService.getTransferNotes(id));
+    }
+
     @Operation(summary = "전원 소견서 작성", description = "UC-DISP-03 · 소견서(투약이력은 GET /api/orders 조회, 연계:GR2)")
     @PostMapping("/{id}/transfer-note")
     public ApiResponse<TransferNoteDto> createTransferNote(
