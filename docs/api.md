@@ -41,7 +41,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
-| UC-CARE-01 | GET | `/api/emergency/care/patients` | 응급환자 목록 | date, status? |
+| UC-CARE-01 | GET | `/api/emergency/care/patients` | 응급환자 목록. `status`: `IN_CARE`(진료 중) / `DONE`(퇴실 절차 완료) / 생략 시 전체. 저장값이 아니라 계산값 — 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동이 병상 배정(02)해야, 전원은 소견서를 써야 DONE. 환자서비스 장애 시 환자명 없이 목록 반환 | date?, status? |
 | UC-CARE-02 | POST | `/api/emergency/care/records` | 진료기록 | encounterId, content |
 | UC-CARE-03 | GET | `/api/emergency/care/treatments` | 접수 건별 처치기록(시행 시각 순) | receptionId |
 | UC-CARE-03 | POST | `/api/emergency/care/treatments` | 처치기록 | encounterId, treatmentCode, orderId?(GR2) |
@@ -72,8 +72,8 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- | --- |
 | UC-DISP-01 | POST | `/api/emergency/dispositions` | 퇴실 결정 | encounterId, dispositionType |
 | UC-DISP-01 | GET | `/api/emergency/dispositions` | 접수 건별 퇴실 결정 이력(최신이 첫 번째) | receptionId |
-| UC-DISP-02 | GET | `/api/emergency/dispositions/{id}/admission-requests` | 입원요청 이력(최신이 첫 번째). 상태는 병동 회신(Kafka)으로 갱신 | id |
-| UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청(퇴실 유형 입원만, 요청됨·배정 완료 상태가 있으면 409, 저장 후 병동으로 Kafka 발행) | id, targetDeptCode?, wardPrefer? |
+| UC-DISP-02 | GET | `/api/emergency/dispositions/{id}/admission-requests` | 입원요청 이력(최신이 첫 번째). 상태(`requestStatusCode` 01 요청됨 / 02 병상 배정 완료 / 03 거부)는 병동 회신(Kafka)으로 갱신, 처음 회신만 반영. `assignedWardCode`: 병동이 실제 배정한 병동(WARD_CD, 02일 때만 값) | id |
+| UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청(퇴실 유형 입원만, 요청됨·배정 완료 상태가 있으면 409, note 500자 이하, DB 커밋 뒤 병동으로 Kafka 발행) | id, targetDeptCode?(DEPT_CD), wardPrefer?(WARD_CD), note? |
 | UC-DISP-03 | GET | `/api/emergency/dispositions/{id}/transfer-notes` | 전원 소견서 목록(최신이 첫 번째) | id |
 | UC-DISP-03 | POST | `/api/emergency/dispositions/{id}/transfer-note` | 전원 소견서(퇴실 유형 전원만) | id, targetHospitalCode, content, writtenById |
 

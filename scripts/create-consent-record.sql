@@ -5,9 +5,9 @@
 -- 제약조건 이름 규칙은 기존 테이블과 동일: PK_{테이블}
 -- RECEPTION_ID는 기존 테이블과 동일하게 FK 없음(접수는 RCP 소유 데이터라 참조 식별자만 보유, CLAUDE.md §9)
 -- *_CODE 컬럼은 CHECK 제약을 걸지 않음 — 코드값은 admin 공통코드가 소유(개발표준 21.4), 검증은 애플리케이션에서 수행
---   CONSENT_TYPE_CODE   : SURGERY / ANESTHESIA / TRANSFUSION / PROCEDURE / PRIVACY   (admin 그룹 CONSENT_TYPE)
---   CONSENT_STATUS_CODE : AGREED / REFUSED / DEFERRED                                 (admin 그룹 CONSENT_STATUS)
---   CONSENTED_BY_CODE   : SELF / GUARDIAN                                             (admin 그룹 CONSENT_BY)
+--   CONSENT_TYPE_CODE   : 01 / 02 / 05 (admin 그룹 CONSENT_TYPE_CD 중 응급이 쓰는 값)
+--   CONSENT_STATUS_CODE : 01 동의 / 02 거부 / 03 유예 (admin 그룹 ER_CONSENT_STATUS_CD)
+--   CONSENTED_BY_CODE   : 01 본인 / 02 보호자       (admin 그룹 CONSENT_BY_CD)
 -- 실행: sqlplus 로 EMERGENCY 계정 접속 후  @create-consent-record.sql
 -- ============================================================
 
