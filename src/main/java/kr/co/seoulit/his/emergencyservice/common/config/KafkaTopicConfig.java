@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 
-@ConditionalOnProperty(name="app.kafka.enabled", havingValue = "true")
+@ConditionalOnProperty(name="app.kafka.intake.enabled", havingValue = "true")
 @Configuration
 public class KafkaTopicConfig {
 

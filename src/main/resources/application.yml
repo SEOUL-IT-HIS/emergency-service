@@ -31,7 +31,13 @@ app:
     # patient-service 배치조회 base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.149:8087
     base-url: ${PATIENT_BASE_URL:http://localhost:8087}
   kafka:
-    enabled: false
+    # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
+    intake:
+      enabled: false
+    # 입원요청(응급→병동) Kafka 연동. 켤 때만 true(개인 PC 개발용 값은 application-local.yml 에 둔다). 토픽 기본값: emergency.admission.requested.v1 /
+    # inpatient.admission.bed-assigned.v1 / inpatient.admission.rejected.v1 (app.kafka.admission.*-topic 으로 변경 가능)
+    admission:
+      enabled: false
 
 spring:
   application:

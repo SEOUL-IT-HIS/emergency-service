@@ -16,4 +16,5 @@
 # ---
 # app:
 #   kafka:
-#     enabled: true
+#     intake:
+#       enabled: true

@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-@ConditionalOnProperty(name="app.kafka.enabled", havingValue = "true")
+@ConditionalOnProperty(name="app.kafka.intake.enabled", havingValue = "true")
 @Slf4j
 @Component
 @RequiredArgsConstructor
