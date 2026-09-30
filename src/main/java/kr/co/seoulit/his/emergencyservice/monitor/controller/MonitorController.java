@@ -31,6 +31,14 @@ public class MonitorController {
         return ApiResponse.success(monitorService.getLongStayAlerts(thresholdHours));
     }
 
+    @Operation(summary = "장기체류 알림 확인 처리", description = "UC-MON-02 · 담당자가 알림을 확인(acknowledge)하면 미확인 목록에서 빠진다")
+    @PatchMapping("/long-stay-alerts/{alertId}/acknowledge")
+    public ApiResponse<LosAlertDto> acknowledgeLongStayAlert(
+            @PathVariable String alertId,
+            @RequestBody LosAlertAcknowledgeRequestDto request) {
+        return ApiResponse.success(monitorService.acknowledgeLongStayAlert(alertId, request));
+    }
+
     @Operation(summary = "외부 병원 가용 정보 조회", description = "UC-MON-03 · 전원 가능 병원 (연계:NEDIS)")
     @GetMapping("/external-hospitals")
     public ApiResponse<List<ExternalHospitalDto>> getExternalHospitals() {

@@ -11,4 +11,6 @@ public class LosAlertDto {
     private String receptionId;
     private Integer thresholdMinutes;
     private LocalDateTime triggeredAt;
+    private String acknowledgedById;
+    private LocalDateTime acknowledgedAt;
 }

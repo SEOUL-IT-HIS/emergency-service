@@ -6,4 +6,7 @@ import java.util.List;
 
 public interface LosAlertRepository extends JpaRepository<LosAlert, String> {
     List<LosAlert> findByAcknowledgedAtIsNull();
+
+    // 같은 기준시간으로는 접수 건당 한 번만 알린다 (확인 후 다시 울리지 않게)
+    boolean existsByReceptionIdAndThresholdMinutes(String receptionId, Integer thresholdMinutes);
 }
