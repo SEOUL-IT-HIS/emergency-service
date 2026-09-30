@@ -95,6 +95,8 @@ public class CareServiceImpl implements CareService {
                     dto.setPatientName(patientNames.get(intake.getPatientId()));
                     dto.setReceivedAt(intake.getReceivedAt());
                     dto.setCareStatusCode(doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE);
+                    dto.setMemo(intake.getMemo());
+                    dto.setChiefComplaintRaw(intake.getChiefComplaintRaw());
 
                     List<TriageAssessment> history =
                             triageAssessmentRepository.findByReceptionIdOrderByAssessedAtAsc(intake.getId());
