@@ -3,6 +3,7 @@ package kr.co.seoulit.his.emergencyservice.resource;
 import kr.co.seoulit.his.emergencyservice.resource.entity.Bed;
 import kr.co.seoulit.his.emergencyservice.resource.repository.BedRepository;
 import lombok.RequiredArgsConstructor;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -25,13 +26,13 @@ public class BedSeeder implements CommandLineRunner {
         if (bedRepository.count() > 0) {
             return;
         }
-        save("C-01", "CRITICAL", "GENERAL");
-        save("U-01", "URGENT", "GENERAL");
-        save("U-02", "URGENT", "TREATMENT");
-        save("I-01", "ISOLATION", "ISOLATION_ROOM");
-        save("I-02", "ISOLATION", "ISOLATION_ROOM");
-        save("I-03", "ISOLATION", "ISOLATION_ROOM");
-        save("I-04", "ISOLATION", "ISOLATION_ROOM");
+        save("C-01", EmgCodes.ZONE_CRITICAL, EmgCodes.BED_TYPE_GENERAL);
+        save("U-01", EmgCodes.ZONE_URGENT, EmgCodes.BED_TYPE_GENERAL);
+        save("U-02", EmgCodes.ZONE_URGENT, EmgCodes.BED_TYPE_TREATMENT);
+        save("I-01", EmgCodes.ZONE_ISOLATION, EmgCodes.BED_TYPE_ISOLATION_ROOM);
+        save("I-02", EmgCodes.ZONE_ISOLATION, EmgCodes.BED_TYPE_ISOLATION_ROOM);
+        save("I-03", EmgCodes.ZONE_ISOLATION, EmgCodes.BED_TYPE_ISOLATION_ROOM);
+        save("I-04", EmgCodes.ZONE_ISOLATION, EmgCodes.BED_TYPE_ISOLATION_ROOM);
     }
 
     private void save(String bedNo, String zoneCode, String bedTypeCode) {
@@ -39,7 +40,7 @@ public class BedSeeder implements CommandLineRunner {
         bed.setBedNo(bedNo);
         bed.setZoneCode(zoneCode);
         bed.setBedTypeCode(bedTypeCode);
-        bed.setBedStatusCode("EMPTY");
+        bed.setBedStatusCode(EmgCodes.BED_STATUS_EMPTY);
         bed.setCreatedAt(LocalDateTime.now());
         bed.setUpdatedAt(LocalDateTime.now());
         bedRepository.save(bed);

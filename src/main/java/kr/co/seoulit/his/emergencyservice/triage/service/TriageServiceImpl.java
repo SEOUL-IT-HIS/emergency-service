@@ -2,6 +2,8 @@ package kr.co.seoulit.his.emergencyservice.triage.service;
 
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.triage.dto.*;
 import kr.co.seoulit.his.emergencyservice.triage.entity.*;
 import kr.co.seoulit.his.emergencyservice.triage.mapper.TriageMapstructMapper;
@@ -21,13 +23,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TriageServiceImpl implements TriageService {
 
-    private static final Set<String> VALID_KTAS_SCORES = Set.of("1", "2", "3", "4", "5");
     private static final Set<String> VALID_ISOLATION_YN = Set.of("Y", "N");
-    private static final Set<String> VALID_SCREEN_TYPES = Set.of("SEPSIS", "STROKE");
-    private static final Set<String> VALID_SCREEN_RESULTS = Set.of("NEGATIVE", "POSITIVE", "INCONCLUSIVE");
-    // TODO: ASSESSMENT_TYPE, ISOLATION_TYPE이 admin 공통코드로 이관되면(21.4) CommonCodeCache 조회로 교체
-    private static final Set<String> VALID_ASSESSMENT_TYPES = Set.of("INITIAL");
-    private static final Set<String> VALID_ISOLATION_TYPES = Set.of("CONTACT", "DROPLET", "AIRBORNE", "PROTECTIVE");
+    // KTAS 등급(TRIAGE_CD)·격리 유형·스크리닝 종류/결과는 admin 공통코드 우선, 그룹이 없으면 EmgCodes 폴백(21.4)
 
     private final EmsReferralRepository emsReferralRepository;
 
@@ -37,6 +34,7 @@ public class TriageServiceImpl implements TriageService {
     private final RiskScreeningRepository riskScreeningRepository;
 
     private final TriageMapstructMapper triageMapper;
+    private final CommonCodeResolver codeResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -64,17 +62,16 @@ public class TriageServiceImpl implements TriageService {
                 || !StringUtils.hasText(request.getAssessedById())) {
             throw new IllegalArgumentException("encounterId, ktasScore, assessedById are required");
         }
-        if (!VALID_KTAS_SCORES.contains(request.getKtasScore())) {
-            throw new IllegalArgumentException("ktasScore must be one of 1~5");
+        codeResolver.require("ktasScore", request.getKtasScore(),
+                codeResolver.valueSet(EmgCodes.KTAS_LEVEL_GROUP, EmgCodes.KTAS_LEVEL_FALLBACK));
+        String assessmentTypeCode = StringUtils.hasText(request.getAssessmentTypeCode())
+                ? request.getAssessmentTypeCode() : EmgCodes.ASSESSMENT_INITIAL;
+        // 신규 분류(POST)는 최초(INITIAL)만 받는다. 재평가(REASSESS)는 PUT 이 새 행으로 추가한다.
+        if (!EmgCodes.ASSESSMENT_INITIAL.equals(assessmentTypeCode)) {
+            throw new IllegalArgumentException("assessmentTypeCode must be " + EmgCodes.ASSESSMENT_INITIAL);
         }
-        String assessmentTypeCode =
-                StringUtils.hasText(request.getAssessmentTypeCode()) ? request.getAssessmentTypeCode() : "INITIAL";
-        if (!VALID_ASSESSMENT_TYPES.contains(assessmentTypeCode)) {
-            throw new IllegalArgumentException("assessmentTypeCode must be INITIAL");
-        }
-        if ("INITIAL".equals(assessmentTypeCode)
-                && triageAssessmentRepository.existsByReceptionIdAndAssessmentTypeCode(
-                        request.getEncounterId(), "INITIAL")) {
+        if (triageAssessmentRepository.existsByReceptionIdAndAssessmentTypeCode(
+                        request.getEncounterId(), EmgCodes.ASSESSMENT_INITIAL)) {
             // 이미 최초 분류(INITIAL)가 등록된 접수 건입니다
             throw new ConflictException("Initial KTAS classification already registered for this encounter: " + request.getEncounterId());
         }
@@ -104,14 +101,13 @@ public class TriageServiceImpl implements TriageService {
 
         String nextScore = StringUtils.hasText(request.getKtasScore())
                 ? request.getKtasScore() : previous.getKtasLevelCode();
-        if (!VALID_KTAS_SCORES.contains(nextScore)) {
-            throw new IllegalArgumentException("ktasScore must be one of 1~5");
-        }
+        codeResolver.require("ktasScore", nextScore,
+                codeResolver.valueSet(EmgCodes.KTAS_LEVEL_GROUP, EmgCodes.KTAS_LEVEL_FALLBACK));
 
         TriageAssessment entity = new TriageAssessment();
         entity.setReceptionId(previous.getReceptionId());
         entity.setKtasLevelCode(nextScore);
-        entity.setAssessmentTypeCode("REASSESS");
+        entity.setAssessmentTypeCode(EmgCodes.ASSESSMENT_REASSESS);
         entity.setAssessedById(request.getAssessedById() != null ? request.getAssessedById() : previous.getAssessedById());
         entity.setReason(request.getReason());
         entity.setAssessedAt(LocalDateTime.now());
@@ -203,9 +199,8 @@ public class TriageServiceImpl implements TriageService {
         if (!StringUtils.hasText(request.getIsolationTypeCode())) {
             throw new IllegalArgumentException("isolationTypeCode is required");
         }
-        if (!VALID_ISOLATION_TYPES.contains(request.getIsolationTypeCode())) {
-            throw new IllegalArgumentException("isolationTypeCode must be one of CONTACT, DROPLET, AIRBORNE, PROTECTIVE");
-        }
+        codeResolver.require("isolationTypeCode", request.getIsolationTypeCode(),
+                codeResolver.valueSet(EmgCodes.ISOLATION_TYPE_GROUP, EmgCodes.ISOLATION_TYPE_FALLBACK));
         if (!StringUtils.hasText(request.getDecidedById())) {
             throw new IllegalArgumentException("decidedById is required");
         }
@@ -266,11 +261,11 @@ public class TriageServiceImpl implements TriageService {
                 || !StringUtils.hasText(request.getScreenedById())) {
             throw new IllegalArgumentException("encounterId, screenType, screenedById are required");
         }
-        if (!VALID_SCREEN_TYPES.contains(request.getScreenType())) {
-            throw new IllegalArgumentException("screenType must be one of SEPSIS, STROKE");
-        }
-        if (StringUtils.hasText(request.getResultCode()) && !VALID_SCREEN_RESULTS.contains(request.getResultCode())) {
-            throw new IllegalArgumentException("resultCode must be one of NEGATIVE, POSITIVE, INCONCLUSIVE");
+        codeResolver.require("screenType", request.getScreenType(),
+                codeResolver.valueSet(EmgCodes.SCREENING_TYPE_GROUP, EmgCodes.SCREENING_TYPE_FALLBACK));
+        if (StringUtils.hasText(request.getResultCode())) {
+            codeResolver.require("resultCode", request.getResultCode(),
+                    codeResolver.valueSet(EmgCodes.SCREENING_RESULT_GROUP, EmgCodes.SCREENING_RESULT_FALLBACK));
         }
 
         RiskScreening entity = new RiskScreening();

@@ -5,6 +5,8 @@ import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordDto;
 import kr.co.seoulit.his.emergencyservice.care.entity.ConsentRecord;
 import kr.co.seoulit.his.emergencyservice.care.repository.ConsentRecordRepository;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,15 +33,15 @@ class ConsentServiceImplTest {
         repository = mock(ConsentRecordRepository.class);
         when(repository.save(any(ConsentRecord.class))).thenAnswer(inv -> inv.getArgument(0));
         commonCodeCache = new CommonCodeCache();
-        service = new ConsentServiceImpl(repository, commonCodeCache);
+        service = new ConsentServiceImpl(repository, new CommonCodeResolver(commonCodeCache));
     }
 
     private static ConsentRecordCreateRequestDto valid() {
         ConsentRecordCreateRequestDto r = new ConsentRecordCreateRequestDto();
         r.setEncounterId("test-reception-001");
-        r.setConsentTypeCode("SURGERY");
-        r.setConsentStatusCode("AGREED");
-        r.setConsentedByCode("SELF");
+        r.setConsentTypeCode(EmgCodes.CONSENT_TYPE_ALLOWED.get(0));
+        r.setConsentStatusCode(EmgCodes.CONSENT_STATUS_AGREED);
+        r.setConsentedByCode(EmgCodes.CONSENT_BY_SELF);
         r.setRecordedById("nurse-001");
         return r;
     }
@@ -58,9 +60,9 @@ class ConsentServiceImplTest {
         ConsentRecordDto dto = service.createConsent(valid());
 
         assertThat(dto.getReceptionId()).isEqualTo("test-reception-001");
-        assertThat(dto.getConsentTypeCode()).isEqualTo("SURGERY");
-        assertThat(dto.getConsentStatusCode()).isEqualTo("AGREED");
-        assertThat(dto.getConsentedByCode()).isEqualTo("SELF");
+        assertThat(dto.getConsentTypeCode()).isEqualTo(EmgCodes.CONSENT_TYPE_ALLOWED.get(0));
+        assertThat(dto.getConsentStatusCode()).isEqualTo(EmgCodes.CONSENT_STATUS_AGREED);
+        assertThat(dto.getConsentedByCode()).isEqualTo(EmgCodes.CONSENT_BY_SELF);
         assertThat(dto.getConsenterName()).isNull();
         assertThat(dto.getReason()).isNull();
         assertThat(dto.getReceivedAt()).isAfterOrEqualTo(before);
@@ -72,9 +74,9 @@ class ConsentServiceImplTest {
         ConsentRecordCreateRequestDto r = valid();
         LocalDateTime received = LocalDateTime.now().minusHours(2);
         r.setReceivedAt(received);
-        r.setConsentedByCode("GUARDIAN");
+        r.setConsentedByCode(EmgCodes.CONSENT_BY_GUARDIAN);
         r.setConsenterName("  Hong Gil-dong  ");
-        r.setConsentStatusCode("REFUSED");
+        r.setConsentStatusCode(EmgCodes.CONSENT_STATUS_REFUSED);
         r.setReason("  refused by family  ");
 
         ConsentRecordDto dto = service.createConsent(r);
@@ -106,38 +108,38 @@ class ConsentServiceImplTest {
     @Test
     void rejectsValuesOutsideTheCodeSets() {
         ConsentRecordCreateRequestDto badType = valid();
-        badType.setConsentTypeCode("DISCHARGE");
+        badType.setConsentTypeCode("03");
         assertThatThrownBy(() -> service.createConsent(badType)).hasMessageContaining("consentTypeCode");
 
         ConsentRecordCreateRequestDto badStatus = valid();
-        badStatus.setConsentStatusCode("MAYBE");
+        badStatus.setConsentStatusCode("99");
         assertThatThrownBy(() -> service.createConsent(badStatus)).hasMessageContaining("consentStatusCode");
 
         ConsentRecordCreateRequestDto badBy = valid();
-        badBy.setConsentedByCode("NEIGHBOR");
+        badBy.setConsentedByCode("99");
         assertThatThrownBy(() -> service.createConsent(badBy)).hasMessageContaining("consentedByCode");
     }
 
     @Test
     void deferredNeedsReason() {
         ConsentRecordCreateRequestDto r = valid();
-        r.setConsentStatusCode("DEFERRED");
+        r.setConsentStatusCode(EmgCodes.CONSENT_STATUS_DEFERRED);
 
         assertThatThrownBy(() -> service.createConsent(r)).hasMessageContaining("reason is required");
 
         r.setReason("patient unconscious");
-        assertThat(service.createConsent(r).getConsentStatusCode()).isEqualTo("DEFERRED");
+        assertThat(service.createConsent(r).getConsentStatusCode()).isEqualTo(EmgCodes.CONSENT_STATUS_DEFERRED);
     }
 
     @Test
     void guardianNeedsName() {
         ConsentRecordCreateRequestDto r = valid();
-        r.setConsentedByCode("GUARDIAN");
+        r.setConsentedByCode(EmgCodes.CONSENT_BY_GUARDIAN);
 
         assertThatThrownBy(() -> service.createConsent(r)).hasMessageContaining("consenterName is required");
 
         r.setConsenterName("Hong");
-        assertThat(service.createConsent(r).getConsentedByCode()).isEqualTo("GUARDIAN");
+        assertThat(service.createConsent(r).getConsentedByCode()).isEqualTo(EmgCodes.CONSENT_BY_GUARDIAN);
     }
 
     @Test
@@ -163,19 +165,23 @@ class ConsentServiceImplTest {
     }
 
     @Test
-    void adminCodesTakePrecedenceOverFallbackAndInactiveOnesAreExcluded() {
-        commonCodeCache.put("CONSENT_TYPE", List.of(code("SURGERY", "Y"), code("PRIVACY", "N"), code("GENETIC", "Y")));
+    void adminCodesTakePrecedenceButOnlyTheAllowedConsentTypesAreUsable() {
+        // admin: 01 사용, 05 비활성, 03(비용견적)은 admin에만 있고 응급이 안 쓰는 값
+        commonCodeCache.put("CONSENT_TYPE_CD", List.of(code("01", "Y"), code("05", "N"), code("03", "Y")));
 
-        ConsentRecordCreateRequestDto genetic = valid();
-        genetic.setConsentTypeCode("GENETIC");
-        assertThat(service.createConsent(genetic).getConsentTypeCode()).isEqualTo("GENETIC");
+        ConsentRecordCreateRequestDto ok = valid();
+        assertThat(service.createConsent(ok).getConsentTypeCode()).isEqualTo("01");
 
         ConsentRecordCreateRequestDto inactive = valid();
-        inactive.setConsentTypeCode("PRIVACY");
+        inactive.setConsentTypeCode("05");
         assertThatThrownBy(() -> service.createConsent(inactive)).hasMessageContaining("consentTypeCode");
 
+        ConsentRecordCreateRequestDto notAllowed = valid();
+        notAllowed.setConsentTypeCode("03");
+        assertThatThrownBy(() -> service.createConsent(notAllowed)).hasMessageContaining("consentTypeCode");
+
         ConsentRecordCreateRequestDto notInAdmin = valid();
-        notInAdmin.setConsentTypeCode("TRANSFUSION");
+        notInAdmin.setConsentTypeCode("02");
         assertThatThrownBy(() -> service.createConsent(notInAdmin)).hasMessageContaining("consentTypeCode");
     }
 
@@ -186,9 +192,9 @@ class ConsentServiceImplTest {
         ConsentRecord row = new ConsentRecord();
         row.setId("c-1");
         row.setReceptionId("test-reception-001");
-        row.setConsentTypeCode("PROCEDURE");
-        row.setConsentStatusCode("AGREED");
-        row.setConsentedByCode("SELF");
+        row.setConsentTypeCode("05");
+        row.setConsentStatusCode(EmgCodes.CONSENT_STATUS_AGREED);
+        row.setConsentedByCode(EmgCodes.CONSENT_BY_SELF);
         row.setReceivedAt(LocalDateTime.of(2026, 9, 30, 9, 0));
         row.setRecordedById("nurse-001");
         row.setRecordedAt(LocalDateTime.of(2026, 9, 30, 9, 1));
@@ -199,6 +205,6 @@ class ConsentServiceImplTest {
 
         assertThat(list).hasSize(1);
         assertThat(list.get(0).getId()).isEqualTo("c-1");
-        assertThat(list.get(0).getConsentTypeCode()).isEqualTo("PROCEDURE");
+        assertThat(list.get(0).getConsentTypeCode()).isEqualTo("05");
     }
 }

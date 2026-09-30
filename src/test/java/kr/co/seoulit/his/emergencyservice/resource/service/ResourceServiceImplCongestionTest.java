@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.resource.service;
 
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.resource.dto.CongestionDto;
 import kr.co.seoulit.his.emergencyservice.resource.dto.CongestionMetricDto;
 import kr.co.seoulit.his.emergencyservice.resource.repository.*;
@@ -41,13 +42,13 @@ class ResourceServiceImplCongestionTest {
 
     @Test
     void zonesWithoutBedsAreReturnedAsNoBeds() {
-        when(bedRepository.countGroupByZoneAndStatus()).thenReturn(List.of(row("URGENT", "OCCUPIED", 2)));
+        when(bedRepository.countGroupByZoneAndStatus()).thenReturn(List.of(row(EmgCodes.ZONE_URGENT, EmgCodes.BED_STATUS_OCCUPIED, 2)));
 
         CongestionDto dto = service.getCongestion();
 
         assertThat(dto.getZones()).extracting(CongestionMetricDto::getZoneCode)
-                .containsExactly("RESUS", "CRITICAL", "URGENT", "FAST_TRACK", "PEDIATRIC", "ISOLATION");
-        CongestionMetricDto resus = zone(dto, "RESUS");
+                .containsExactly(EmgCodes.ZONE_RESUS, EmgCodes.ZONE_CRITICAL, EmgCodes.ZONE_URGENT, EmgCodes.ZONE_FAST_TRACK, EmgCodes.ZONE_PEDIATRIC, EmgCodes.ZONE_ISOLATION);
+        CongestionMetricDto resus = zone(dto, EmgCodes.ZONE_RESUS);
         assertThat(resus.getTotalBeds()).isZero();
         assertThat(resus.getCongestionRate()).isNull();
         assertThat(resus.getCongestionLevel()).isEqualTo("NO_BEDS");
@@ -56,13 +57,13 @@ class ResourceServiceImplCongestionTest {
     @Test
     void cleaningAndUnknownCountAsUnavailableButOutOfServiceIsExcludedFromCapacity() {
         when(bedRepository.countGroupByZoneAndStatus()).thenReturn(List.of(
-                row("URGENT", "OCCUPIED", 1),
-                row("URGENT", "CLEANING", 1),
-                row("URGENT", "EMPTY", 1),
-                row("URGENT", "OUT_OF_SERVICE", 1),
-                row("URGENT", null, 1)));
+                row(EmgCodes.ZONE_URGENT, EmgCodes.BED_STATUS_OCCUPIED, 1),
+                row(EmgCodes.ZONE_URGENT, EmgCodes.BED_STATUS_CLEANING, 1),
+                row(EmgCodes.ZONE_URGENT, EmgCodes.BED_STATUS_EMPTY, 1),
+                row(EmgCodes.ZONE_URGENT, EmgCodes.BED_STATUS_OUT_OF_SERVICE, 1),
+                row(EmgCodes.ZONE_URGENT, null, 1)));
 
-        CongestionMetricDto urgent = zone(service.getCongestion(), "URGENT");
+        CongestionMetricDto urgent = zone(service.getCongestion(), EmgCodes.ZONE_URGENT);
 
         assertThat(urgent.getTotalBeds()).isEqualTo(5);
         assertThat(urgent.getOperationalBeds()).isEqualTo(4);
@@ -76,25 +77,25 @@ class ResourceServiceImplCongestionTest {
     @Test
     void levelBoundaries() {
         when(bedRepository.countGroupByZoneAndStatus()).thenReturn(List.of(
-                row("RESUS", "OCCUPIED", 1), row("RESUS", "EMPTY", 1),          // 50%
-                row("CRITICAL", "OCCUPIED", 9), row("CRITICAL", "EMPTY", 1),    // 90%
-                row("PEDIATRIC", "OCCUPIED", 49), row("PEDIATRIC", "EMPTY", 51) // 49%
+                row(EmgCodes.ZONE_RESUS, EmgCodes.BED_STATUS_OCCUPIED, 1), row(EmgCodes.ZONE_RESUS, EmgCodes.BED_STATUS_EMPTY, 1),          // 50%
+                row(EmgCodes.ZONE_CRITICAL, EmgCodes.BED_STATUS_OCCUPIED, 9), row(EmgCodes.ZONE_CRITICAL, EmgCodes.BED_STATUS_EMPTY, 1),    // 90%
+                row(EmgCodes.ZONE_PEDIATRIC, EmgCodes.BED_STATUS_OCCUPIED, 49), row(EmgCodes.ZONE_PEDIATRIC, EmgCodes.BED_STATUS_EMPTY, 51) // 49%
         ));
 
         CongestionDto dto = service.getCongestion();
 
-        assertThat(zone(dto, "RESUS").getCongestionLevel()).isEqualTo("MODERATE");
-        assertThat(zone(dto, "CRITICAL").getCongestionLevel()).isEqualTo("SATURATED");
-        assertThat(zone(dto, "PEDIATRIC").getCongestionLevel()).isEqualTo("LOW");
+        assertThat(zone(dto, EmgCodes.ZONE_RESUS).getCongestionLevel()).isEqualTo("MODERATE");
+        assertThat(zone(dto, EmgCodes.ZONE_CRITICAL).getCongestionLevel()).isEqualTo("SATURATED");
+        assertThat(zone(dto, EmgCodes.ZONE_PEDIATRIC).getCongestionLevel()).isEqualTo("LOW");
     }
 
     @Test
     void unknownZoneAndMissingZoneAreKeptSoTotalsMatchZoneSums() {
         when(bedRepository.countGroupByZoneAndStatus()).thenReturn(List.of(
-                row("CRITICAL", "OCCUPIED", 1),
-                row("ISOLATION", "EMPTY", 4),
-                row("OBSERVATION", "EMPTY", 2),
-                row(null, "OCCUPIED", 1)));
+                row(EmgCodes.ZONE_CRITICAL, EmgCodes.BED_STATUS_OCCUPIED, 1),
+                row(EmgCodes.ZONE_ISOLATION, EmgCodes.BED_STATUS_EMPTY, 4),
+                row("OBSERVATION", EmgCodes.BED_STATUS_EMPTY, 2),
+                row(null, EmgCodes.BED_STATUS_OCCUPIED, 1)));
 
         CongestionDto dto = service.getCongestion();
 

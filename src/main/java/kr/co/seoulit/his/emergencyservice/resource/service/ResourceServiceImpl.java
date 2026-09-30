@@ -3,6 +3,7 @@ package kr.co.seoulit.his.emergencyservice.resource.service;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.resource.dto.*;
 import kr.co.seoulit.his.emergencyservice.resource.entity.*;
@@ -23,16 +24,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ResourceServiceImpl implements ResourceService {
 
-    private static final String ZONE_GROUP_CODE = "ZONE";
-    // admin 공통코드 ZONE 그룹이 아직 없을 때 쓰는 기본 구역 (Jira UD2-81 기준)
-    private static final List<String> ZONE_FALLBACK =
-            List.of("RESUS", "CRITICAL", "URGENT", "FAST_TRACK", "PEDIATRIC", "ISOLATION");
+    // 구역 목록은 admin 공통코드 ZONE_CD(없으면 EmgCodes.ZONE_FALLBACK, Jira UD2-81 기준)
     private static final String UNASSIGNED_ZONE = "UNASSIGNED";
 
-    private static final String STATUS_EMPTY = "EMPTY";
-    private static final String STATUS_OCCUPIED = "OCCUPIED";
-    private static final String STATUS_CLEANING = "CLEANING";
-    private static final String STATUS_OUT_OF_SERVICE = "OUT_OF_SERVICE";
+    private static final String STATUS_EMPTY = EmgCodes.BED_STATUS_EMPTY;
+    private static final String STATUS_OCCUPIED = EmgCodes.BED_STATUS_OCCUPIED;
+    private static final String STATUS_CLEANING = EmgCodes.BED_STATUS_CLEANING;
+    private static final String STATUS_OUT_OF_SERVICE = EmgCodes.BED_STATUS_OUT_OF_SERVICE;
     private static final String LEVEL_NO_BEDS = "NO_BEDS";
 
     private final BedRepository bedRepository;
@@ -82,9 +80,9 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     private List<String> zoneCodes() {
-        List<AdminCommonCodeItemDto> codes = commonCodeCache.get(ZONE_GROUP_CODE);
+        List<AdminCommonCodeItemDto> codes = commonCodeCache.get(EmgCodes.ZONE_GROUP);
         if (codes.isEmpty()) {
-            return ZONE_FALLBACK;
+            return EmgCodes.ZONE_FALLBACK;
         }
         return codes.stream()
                 .filter(code -> !"N".equals(code.getUseYn()))
@@ -166,7 +164,7 @@ public class ResourceServiceImpl implements ResourceService {
         }
         Bed bed = bedRepository.findById(request.getBedId())
                 .orElseThrow(() -> ResourceNotFoundException.of("bed", request.getBedId()));
-        if ("OCCUPIED".equals(bed.getBedStatusCode())) {
+        if (STATUS_OCCUPIED.equals(bed.getBedStatusCode())) {
             throw new ConflictException("bed already occupied: " + request.getBedId());
         }
         BedAssignment assignment = new BedAssignment();
@@ -178,7 +176,7 @@ public class ResourceServiceImpl implements ResourceService {
         assignment.setUpdatedAt(LocalDateTime.now());
         BedAssignment saved = bedAssignmentRepository.save(assignment);
 
-        bed.setBedStatusCode("OCCUPIED");
+        bed.setBedStatusCode(STATUS_OCCUPIED);
         bed.setUpdatedAt(LocalDateTime.now());
 
         BedAssignmentDto dto = new BedAssignmentDto();
@@ -208,7 +206,7 @@ public class ResourceServiceImpl implements ResourceService {
         assignment.setUpdatedAt(LocalDateTime.now());
 
         Bed bed = assignment.getBed();
-        bed.setBedStatusCode("EMPTY");
+        bed.setBedStatusCode(STATUS_EMPTY);
         bed.setUpdatedAt(LocalDateTime.now());
 
         BedAssignmentDto dto = new BedAssignmentDto();

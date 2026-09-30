@@ -4,8 +4,8 @@ import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordCreateRequestDto
 import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordDto;
 import kr.co.seoulit.his.emergencyservice.care.entity.ConsentRecord;
 import kr.co.seoulit.his.emergencyservice.care.repository.ConsentRecordRepository;
-import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
-import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
+import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,17 +25,10 @@ import java.util.stream.Collectors;
 public class ConsentServiceImpl implements ConsentService {
 
     // admin 공통코드 그룹. admin 캐시에 그룹이 없으면 아래 폴백 값을 쓴다(admin 반영 후에는 코드 수정 없이 전환).
-    static final String CONSENT_TYPE_GROUP_CODE = "CONSENT_TYPE";
-    static final String CONSENT_STATUS_GROUP_CODE = "CONSENT_STATUS";
-    static final String CONSENT_BY_GROUP_CODE = "CONSENT_BY";
-    static final Set<String> CONSENT_TYPE_FALLBACK =
-            Set.of("SURGERY", "ANESTHESIA", "TRANSFUSION", "PROCEDURE", "PRIVACY");
-    static final Set<String> CONSENT_STATUS_FALLBACK = Set.of("AGREED", "REFUSED", "DEFERRED");
-    static final Set<String> CONSENT_BY_FALLBACK = Set.of("SELF", "GUARDIAN");
 
     // 값 자체로 분기하는 규칙(유예면 사유 필수, 보호자면 이름 필수)에 쓰는 값
-    private static final String STATUS_DEFERRED = "DEFERRED";
-    private static final String BY_GUARDIAN = "GUARDIAN";
+    private static final String STATUS_DEFERRED = EmgCodes.CONSENT_STATUS_DEFERRED;
+    private static final String BY_GUARDIAN = EmgCodes.CONSENT_BY_GUARDIAN;
 
     private static final int NAME_MAX = 100;
     private static final int REASON_MAX = 500;
@@ -43,7 +36,7 @@ public class ConsentServiceImpl implements ConsentService {
     private static final long FUTURE_TOLERANCE_MINUTES = 5;
 
     private final ConsentRecordRepository consentRecordRepository;
-    private final CommonCodeCache commonCodeCache;
+    private final CommonCodeResolver codeResolver;
 
     @Override
     @Transactional
@@ -55,12 +48,14 @@ public class ConsentServiceImpl implements ConsentService {
             throw new IllegalArgumentException(
                     "encounterId, consentTypeCode, consentStatusCode, consentedByCode, recordedById are required");
         }
-        requireOneOf("consentTypeCode", request.getConsentTypeCode(),
-                validCodes(CONSENT_TYPE_GROUP_CODE, CONSENT_TYPE_FALLBACK));
-        requireOneOf("consentStatusCode", request.getConsentStatusCode(),
-                validCodes(CONSENT_STATUS_GROUP_CODE, CONSENT_STATUS_FALLBACK));
-        requireOneOf("consentedByCode", request.getConsentedByCode(),
-                validCodes(CONSENT_BY_GROUP_CODE, CONSENT_BY_FALLBACK));
+        // 동의서 종류는 admin CONSENT_TYPE_CD 중 응급이 쓰기로 한 01·02·05만 허용(수술·마취·침습적 시술)
+        Set<String> validTypes = codeResolver.valueSet(EmgCodes.CONSENT_TYPE_GROUP, EmgCodes.CONSENT_TYPE_ALLOWED);
+        validTypes.retainAll(EmgCodes.CONSENT_TYPE_ALLOWED);
+        codeResolver.require("consentTypeCode", request.getConsentTypeCode(), validTypes);
+        codeResolver.require("consentStatusCode", request.getConsentStatusCode(),
+                codeResolver.valueSet(EmgCodes.CONSENT_STATUS_GROUP, EmgCodes.CONSENT_STATUS_FALLBACK));
+        codeResolver.require("consentedByCode", request.getConsentedByCode(),
+                codeResolver.valueSet(EmgCodes.CONSENT_BY_GROUP, EmgCodes.CONSENT_BY_FALLBACK));
 
         if (STATUS_DEFERRED.equals(request.getConsentStatusCode()) && !StringUtils.hasText(request.getReason())) {
             throw new IllegalArgumentException("reason is required when consentStatusCode is DEFERRED");
@@ -105,23 +100,6 @@ public class ConsentServiceImpl implements ConsentService {
         return consentRecordRepository.findByReceptionIdOrderByReceivedAtDescRecordedAtDesc(receptionId).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
-    }
-
-    private Set<String> validCodes(String groupCode, Set<String> fallback) {
-        List<AdminCommonCodeItemDto> codes = commonCodeCache.get(groupCode);
-        if (codes.isEmpty()) {
-            return fallback;
-        }
-        return codes.stream()
-                .filter(code -> !"N".equals(code.getUseYn()))
-                .map(AdminCommonCodeItemDto::getCodeValue)
-                .collect(Collectors.toSet());
-    }
-
-    private void requireOneOf(String field, String value, Set<String> allowed) {
-        if (!allowed.contains(value)) {
-            throw new IllegalArgumentException(field + " must be one of " + allowed.stream().sorted().collect(Collectors.joining(", ")));
-        }
     }
 
     private ConsentRecordDto toDto(ConsentRecord entity) {
