@@ -83,6 +83,22 @@ class DispositionFollowUpTest {
     }
 
     @Test
+    void admissionEventIsPublishedOnlyAfterTheTransactionCommits() {
+        disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.createAdmissionRequest("d-admit", new AdmissionRequestCreateDto());
+            // 커밋 전에는 아직 발행하지 않는다(병동의 빠른 회신이 저장 전 요청을 못 찾는 문제 방지)
+            org.mockito.Mockito.verifyNoInteractions(publisher);
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            org.mockito.Mockito.verify(publisher).publishRequested(any(Disposition.class), any(AdmissionRequest.class), any(), any());
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
     void duplicateRequestIsBlockedUntilTheEarlierOneIsRejected() {
         Disposition d = disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
         when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-admit"))

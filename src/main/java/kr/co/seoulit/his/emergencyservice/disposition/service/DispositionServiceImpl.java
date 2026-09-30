@@ -13,6 +13,8 @@ import kr.co.seoulit.his.emergencyservice.disposition.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -81,7 +83,9 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setUpdatedAt(LocalDateTime.now());
         AdmissionRequest saved = admissionRequestRepository.save(entity);
         // 병동으로 입원요청 이벤트 발행(설정이 꺼져 있으면 로그만). 발행 실패가 저장을 막지 않는다.
-        admissionEventPublisher.publishRequested(disposition, saved, request.getWardPrefer(), request.getNote());
+        // DB 커밋 뒤에 발행한다: 커밋 전에 보내면 병동의 빠른 회신이 아직 없는 요청을 찾다가 유실될 수 있다.
+        runAfterCommit(() -> admissionEventPublisher.publishRequested(
+                disposition, saved, request.getWardPrefer(), request.getNote()));
 
         AdmissionRequestDto dto = new AdmissionRequestDto();
         dto.setId(saved.getId());
@@ -145,6 +149,20 @@ public class DispositionServiceImpl implements DispositionService {
                 .filter(code -> !"N".equals(code.getUseYn()))
                 .map(AdminCommonCodeItemDto::getCodeValue)
                 .collect(Collectors.toSet());
+    }
+
+    /** 트랜잭션 안이면 커밋 성공 뒤에 실행(롤백되면 실행 안 함), 트랜잭션 밖이면 바로 실행한다 */
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     /** admin 그룹이 캐시에 있을 때만 값을 검증한다(admin 이 꺼져 있으면 값 검증 없이 통과). 값이 비어 있으면 건너뛴다. */

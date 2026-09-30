@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * 응급 → 병동 입원요청을 Kafka 로 발행한다(app.kafka.admission.enabled=true).
  * 토픽 이름은 설정으로 바꿀 수 있다: app.kafka.admission.requested-topic (기본 emergency.admission.requested.v1).
- * 발행 실패가 입원요청 저장을 막지 않는다(저장은 이미 끝난 뒤, 실패는 로그로 남기고 화면에서 상태가 '요청됨'으로 남는다).
+ * 서비스가 DB 커밋 뒤에 호출한다. 발행 실패가 입원요청 저장을 막지 않는다(저장은 이미 끝난 뒤, 실패는 로그로 남기고 화면에서 상태가 '요청됨'으로 남는다).
  */
 @Slf4j
 @Component
