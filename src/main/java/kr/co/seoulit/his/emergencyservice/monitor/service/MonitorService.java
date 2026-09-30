@@ -6,7 +6,6 @@ import java.util.List;
 public interface MonitorService {
     DashboardDto getDashboard();
     List<LosAlertDto> getLongStayAlerts(Integer thresholdHours);
-    List<ExternalHospitalDto> getExternalHospitals();
     int detectLongStayPatients();
     LosAlertDto acknowledgeLongStayAlert(String alertId, LosAlertAcknowledgeRequestDto request);
 }

@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -63,20 +62,6 @@ public class MonitorServiceImpl implements MonitorService {
                 .filter(a -> a.getThresholdMinutes() == null || a.getThresholdMinutes() >= minutes)
                 .map(this::toDto)
                 .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ExternalHospitalDto> getExternalHospitals() {
-        // NEDIS 연동 전 stub — 외부 규격 확정 후 교체
-        List<ExternalHospitalDto> list = new ArrayList<>();
-        ExternalHospitalDto sample = new ExternalHospitalDto();
-        sample.setHospitalCode("11100000");
-        sample.setHospitalName("NEDIS stub hospital");
-        sample.setRegion("SEOUL");
-        sample.setAvailableBeds(0);
-        list.add(sample);
-        return list;
     }
 
     /**

@@ -38,10 +38,4 @@ public class MonitorController {
             @RequestBody LosAlertAcknowledgeRequestDto request) {
         return ApiResponse.success(monitorService.acknowledgeLongStayAlert(alertId, request));
     }
-
-    @Operation(summary = "외부 병원 가용 정보 조회", description = "UC-MON-03 · 전원 가능 병원 (연계:NEDIS)")
-    @GetMapping("/external-hospitals")
-    public ApiResponse<List<ExternalHospitalDto>> getExternalHospitals() {
-        return ApiResponse.success(monitorService.getExternalHospitals());
-    }
 }
