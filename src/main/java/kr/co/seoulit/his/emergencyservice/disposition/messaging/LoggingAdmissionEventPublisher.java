@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 public class LoggingAdmissionEventPublisher implements AdmissionEventPublisher {
 
     @Override
-    public void publishRequested(Disposition disposition, AdmissionRequest request, String wardPref) {
+    public void publishRequested(Disposition disposition, AdmissionRequest request, String wardPref, String note) {
         log.info("입원요청 저장(Kafka 발행 꺼짐: app.kafka.admission.enabled=false) dispositionId={}", disposition.getId());
     }
 }

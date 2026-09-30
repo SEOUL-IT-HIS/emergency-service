@@ -13,6 +13,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.time.format.DateTimeFormatter;
 
 /**
  * 응급 → 병동 입원요청을 Kafka 로 발행한다(app.kafka.admission.enabled=true).
@@ -25,6 +28,9 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "app.kafka.admission.enabled", havingValue = "true")
 public class KafkaAdmissionEventPublisher implements AdmissionEventPublisher {
 
+    /** 병동팀 합의 형식: 2026-10-01T14:30:00 (소수 초 없음) */
+    static final DateTimeFormatter REQUESTED_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final ReceptionIntakeRepository receptionIntakeRepository;
@@ -34,7 +40,7 @@ public class KafkaAdmissionEventPublisher implements AdmissionEventPublisher {
     private String requestedTopic;
 
     @Override
-    public void publishRequested(Disposition disposition, AdmissionRequest request, String wardPref) {
+    public void publishRequested(Disposition disposition, AdmissionRequest request, String wardPref, String note) {
         String receptionId = disposition.getReceptionId();
         String patientId = receptionIntakeRepository.findById(receptionId)
                 .map(ReceptionIntake::getPatientId).orElse(null);
@@ -43,7 +49,8 @@ public class KafkaAdmissionEventPublisher implements AdmissionEventPublisher {
                 .anyMatch(a -> a.getReleasedAt() == null && "Y".equals(a.getRequiredYn()));
         AdmissionRequestedEvent event = new AdmissionRequestedEvent(
                 disposition.getId(), receptionId, patientId, request.getTargetDeptCode(), wardPref,
-                isolation ? "Y" : "N", disposition.getDecidedById(), request.getRequestedAt());
+                isolation ? "Y" : "N", disposition.getDecidedById(),
+                request.getRequestedAt().format(REQUESTED_AT_FORMAT), StringUtils.hasText(note) ? note : null);
         try {
             kafkaTemplate.send(requestedTopic, disposition.getId(), objectMapper.writeValueAsString(event));
             log.info("입원요청 발행 topic={} dispositionId={}", requestedTopic, disposition.getId());

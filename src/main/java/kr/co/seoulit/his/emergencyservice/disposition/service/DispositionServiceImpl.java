@@ -62,6 +62,9 @@ public class DispositionServiceImpl implements DispositionService {
         }
         requireIfKnown("targetDeptCode", request.getTargetDeptCode(), EmgCodes.DEPT_GROUP);
         requireIfKnown("wardPrefer", request.getWardPrefer(), EmgCodes.WARD_GROUP);
+        if (request.getNote() != null && request.getNote().length() > 500) {
+            throw new IllegalArgumentException("note must be at most 500 characters");
+        }
         boolean alreadyActive = admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc(dispositionId).stream()
                 .anyMatch(a -> !EmgCodes.ADMISSION_REJECTED.equals(a.getRequestStatusCode()));
         if (alreadyActive) {
@@ -78,7 +81,7 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setUpdatedAt(LocalDateTime.now());
         AdmissionRequest saved = admissionRequestRepository.save(entity);
         // 병동으로 입원요청 이벤트 발행(설정이 꺼져 있으면 로그만). 발행 실패가 저장을 막지 않는다.
-        admissionEventPublisher.publishRequested(disposition, saved, request.getWardPrefer());
+        admissionEventPublisher.publishRequested(disposition, saved, request.getWardPrefer(), request.getNote());
 
         AdmissionRequestDto dto = new AdmissionRequestDto();
         dto.setId(saved.getId());

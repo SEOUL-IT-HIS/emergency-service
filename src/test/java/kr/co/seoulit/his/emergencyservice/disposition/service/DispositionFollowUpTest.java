@@ -75,10 +75,11 @@ class DispositionFollowUpTest {
         disposition("d-admit", EmgCodes.DISPOSITION_ADMIT);
         AdmissionRequestCreateDto req = new AdmissionRequestCreateDto();
         req.setWardPrefer("06");
+        req.setNote("observe for 24h");
         AdmissionRequestDto dto = service.createAdmissionRequest("d-admit", req);
         assertThat(dto.getRequestStatusCode()).isEqualTo(EmgCodes.ADMISSION_REQUESTED);
         // 저장 뒤 병동으로 발행(희망 병동 전달)
-        org.mockito.Mockito.verify(publisher).publishRequested(any(Disposition.class), any(AdmissionRequest.class), org.mockito.ArgumentMatchers.eq("06"));
+        org.mockito.Mockito.verify(publisher).publishRequested(any(Disposition.class), any(AdmissionRequest.class), org.mockito.ArgumentMatchers.eq("06"), org.mockito.ArgumentMatchers.eq("observe for 24h"));
     }
 
     @Test

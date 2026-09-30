@@ -164,7 +164,7 @@ sequenceDiagram
   participant Kafka as Kafka
   participant IPT as ward / inpatient-service
 
-  EMG->>Kafka: publish ADMISSION_REQUESTED<br/>{dispositionId, encounterId, patientId, targetDeptCode, wardPref, isolationYn, requestedBy, requestedAt}
+  EMG->>Kafka: publish ADMISSION_REQUESTED<br/>{dispositionId, encounterId, patientId, targetDeptCode, wardPref, isolationYn, requestedBy, requestedAt, note?}
   Kafka-->>IPT: consume ADMISSION_REQUESTED
   IPT->>IPT: 병상 예약(RESERVED) → 배정 확정(OCCUPIED)
   IPT->>Kafka: publish BED_ASSIGNED | ADMISSION_REJECTED<br/>{dispositionId, wardCode, bedId?, rejectReason?}

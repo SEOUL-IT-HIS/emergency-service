@@ -1,11 +1,11 @@
 package kr.co.seoulit.his.emergencyservice.disposition.messaging;
 
-import java.time.LocalDateTime;
-
 /**
  * 응급 → 병동 입원요청 이벤트(ADMISSION_REQUESTED). 규격은 docs/flow.md 7-1장 / 병동팀 확인 메시지 기준.
  * dispositionId 가 요청·회신을 잇는 키다(병동이 회신에 그대로 돌려준다).
- * 응급에는 진단 데이터가 없어 diagnosis 는 뺐다. patientId·isolationYn 은 발행 시점에 접수·격리평가에서 조회해 채운다.
+ * 응급에는 진단 데이터가 없어 diagnosis 대신 선택 필드 note(요청 메모, 자유 텍스트)만 둔다(병동팀 합의 2026-09-30).
+ * requestedBy 는 응급에서 퇴실을 결정한 의사 ID다(입원 후 주치의가 아닐 수 있어 병동이 주치의를 따로 정한다).
+ * requestedAt 은 병동팀 합의 형식 "yyyy-MM-dd'T'HH:mm:ss"(소수 초 없음) 문자열이다. 메시지 key 는 dispositionId. patientId·isolationYn 은 발행 시점에 접수·격리평가에서 조회해 채운다.
  */
 public record AdmissionRequestedEvent(
         String dispositionId,
@@ -15,5 +15,6 @@ public record AdmissionRequestedEvent(
         String wardPref,
         String isolationYn,
         String requestedBy,
-        LocalDateTime requestedAt) {
+        String requestedAt,
+        String note) {
 }
