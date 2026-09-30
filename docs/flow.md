@@ -164,16 +164,19 @@ sequenceDiagram
   participant Kafka as Kafka
   participant IPT as ward / inpatient-service
 
-  EMG->>Kafka: publish ADMISSION_REQUESTED<br/>{dispositionId, encounterId, patientId, targetDeptCode, wardPref, isolationYn, requestedBy, requestedAt, note?}
+  EMG->>Kafka: publish ADMISSION_REQUESTED<br/>{dispositionId, admissionRequestId, encounterId, patientId, targetDeptCode, wardPref, isolationYn, requestedBy, requestedAt, note?}
   Kafka-->>IPT: consume ADMISSION_REQUESTED
   IPT->>IPT: 병상 예약(RESERVED) → 배정 확정(OCCUPIED)
-  IPT->>Kafka: publish BED_ASSIGNED | ADMISSION_REJECTED<br/>{dispositionId, wardCode, bedId?, rejectReason?}
+  IPT->>Kafka: publish BED_ASSIGNED | ADMISSION_REJECTED<br/>{dispositionId, admissionRequestId?, wardCode, bedId?, rejectReason?}
   Kafka-->>EMG: consume BED_ASSIGNED | ADMISSION_REJECTED
   EMG->>EMG: 입원요청 상태 갱신 (의료진 화면 표시용)
 ```
 
 - 입원요청 상태(`ADMISSION_REQUEST.request_status_code`, admin 그룹 `ADMISSION_REQUEST_STATUS_CD`): 01 요청됨 → 02 병상 배정 완료 | 03 거부.
 - **구현(2026-09-30)**: 발행 `KafkaAdmissionEventPublisher`, 회신 구독 `AdmissionReplyKafkaListener` + `AdmissionReplyHandler`. 기본은 **꺼짐**(`app.kafka.admission.enabled=false` → 저장만 하고 로그). 병동팀과 규격 합의 뒤 `true` 로 켠다. 토픽은 설정으로 바꾼다: `app.kafka.admission.requested-topic`(기본 `emergency.admission.requested.v1`), `app.kafka.admission.bed-assigned-topic`(`inpatient.admission.bed-assigned.v1`), `app.kafka.admission.rejected-topic`(`inpatient.admission.rejected.v1`). 실제 브로커와의 송수신은 아직 확인하지 못했다(병동 규격 확정 전).
+- **이번 범위(병동팀 합의 2026-09-30)**: 처음 배정 회신만 반영한다. 배정 후 병상 변경·배정 취소, 입원요청 취소 이벤트는 없다(필요하면 병동에서 수동 정리). 화면의 병동은 희망 병동(wardPref)이 아니라 BED_ASSIGNED 회신의 `wardCode`(`ADMISSION_REQUEST.ASSIGNED_WARD_CODE`, 컬럼 추가 스크립트 `scripts/alter-admission-request-add-ward.sql`)로 보여준다.
+- **재요청**: 거부된 뒤 다시 요청해도 `dispositionId`는 같다. 대신 요청마다 새 `admissionRequestId`를 메시지에 실어 보내고, 병동이 회신에 그대로 돌려주면 그 요청에 정확히 반영한다(없으면 가장 최근 요청). 이미 배정/거부된 요청은 뒤늦은 회신으로 덮어쓰지 않는다.
+- **서버가 꺼져 있는 동안**: Kafka가 메시지를 보관하므로, 병동 서버가 꺼진 사이의 요청은 병동이 켜질 때, 응급 서버가 꺼진 사이의 회신은 응급이 켜질 때(컨슈머 그룹 `emergency-service-admission`이 마지막으로 읽은 위치부터) 처리된다.
 - `dispositionId`가 요청·응답을 잇는 키다. 병동은 응답에 반드시 그대로 돌려줘야 한다.
 - `patientId`·`isolationYn`은 응급이 발행 시점에 접수(RECEPTION_INTAKE)·격리평가에서 조회해 채운다. 응급에는 진단 데이터가 없어 `diagnosis`는 뺐다(병동이 필요하면 협의).
 - 병상 **가용 여부 조회**(`GET`, IPT)는 이 이벤트 흐름과 별개로 계속 **동기 REST 유지** — 쓰기 없음, 참고용 사전 체크.
