@@ -76,8 +76,16 @@ public class CareServiceImpl implements CareService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Map<String, String> patientNames = patientClient.getPatients(patientIds).stream()
-                .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName));
+        // 환자서비스가 응답하지 않아도 목록은 떠야 한다(이름만 비움). 예전엔 여기서 예외가 나 목록 전체가 500 이었다.
+        Map<String, String> patientNames;
+        try {
+            patientNames = patientClient.getPatients(patientIds).stream()
+                    .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName, (a, b) -> a));
+        } catch (RuntimeException e) {
+            log.warn("환자서비스 조회 실패 - 환자명 없이 목록을 내려줍니다: {}", e.getMessage());
+            patientNames = Map.of();
+        }
+        final Map<String, String> names = patientNames;
         Set<String> doneReceptionIds = doneReceptionIds(intakes);
 
         return intakes.stream()
@@ -92,7 +100,7 @@ public class CareServiceImpl implements CareService {
                 .map(intake -> {
                     EmergencyPatientDto dto = new EmergencyPatientDto();
                     dto.setReceptionId(intake.getId());
-                    dto.setPatientName(patientNames.get(intake.getPatientId()));
+                    dto.setPatientName(names.get(intake.getPatientId()));
                     dto.setReceivedAt(intake.getReceivedAt());
                     dto.setCareStatusCode(doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE);
                     dto.setMemo(intake.getMemo());
