@@ -132,7 +132,7 @@ public class CareServiceImpl implements CareService {
                 || !StringUtils.hasText(request.getNoteTypeCode())) {
             throw new IllegalArgumentException("encounterId, noteTypeCode, content, recordedById are required");
         }
-        // 진료기록 종류: admin NOTE_TYPE_CD(초진/재평가/처치/퇴실요약), 그룹이 없으면 폴백
+        // 진료기록 종류: admin ER_NOTE_TYPE_CD(초진/재평가/처치/퇴실요약), 그룹이 없으면 폴백
         codeResolver.require("noteTypeCode", request.getNoteTypeCode(),
                 codeResolver.valueSet(EmgCodes.NOTE_TYPE_GROUP, EmgCodes.NOTE_TYPE_FALLBACK));
         ClinicalNote entity = new ClinicalNote();

@@ -14,22 +14,22 @@ public final class EmgCodes {
     }
 
     // ---- 그룹코드 ----
-    public static final String ZONE_GROUP = "ZONE_CD";
-    public static final String BED_STATUS_GROUP = "BED_STATUS_CD";
-    public static final String BED_TYPE_GROUP = "BED_TYPE_CD";
-    public static final String DISPOSITION_TYPE_GROUP = "DISPOSITION_TYPE_CD";
+    public static final String ZONE_GROUP = "ER_ZONE_CD";
+    public static final String BED_STATUS_GROUP = "ER_BED_STATUS_CD";
+    public static final String BED_TYPE_GROUP = "ER_BED_TYPE_CD";
+    public static final String DISPOSITION_TYPE_GROUP = "ER_DISPOSITION_TYPE_CD";
     /** admin에 이미 있는 그룹(KTAS 01~05) */
     public static final String KTAS_LEVEL_GROUP = "TRIAGE_CD";
-    public static final String ASSESSMENT_TYPE_GROUP = "ASSESSMENT_TYPE_CD";
-    public static final String ISOLATION_TYPE_GROUP = "ISOLATION_TYPE_CD";
+    public static final String ASSESSMENT_TYPE_GROUP = "ER_ASSESSMENT_TYPE_CD";
+    public static final String ISOLATION_TYPE_GROUP = "ER_ISOLATION_TYPE_CD";
     public static final String SCREENING_TYPE_GROUP = "SCREENING_TYPE_CD";
     public static final String SCREENING_RESULT_GROUP = "SCREENING_RESULT_CD";
-    public static final String NOTE_TYPE_GROUP = "NOTE_TYPE_CD";
+    public static final String NOTE_TYPE_GROUP = "ER_NOTE_TYPE_CD";
     /** admin에 이미 있는 그룹. 응급은 01·02·05만 쓴다 */
     public static final String CONSENT_TYPE_GROUP = "CONSENT_TYPE_CD";
-    public static final String CONSENT_STATUS_GROUP = "CONSENT_STATUS_CD";
+    public static final String CONSENT_STATUS_GROUP = "ER_CONSENT_STATUS_CD";
     public static final String CONSENT_BY_GROUP = "CONSENT_BY_CD";
-    public static final String TREATMENT_TYPE_GROUP = "TREATMENT_TYPE_CD";
+    public static final String TREATMENT_TYPE_GROUP = "ER_TREATMENT_TYPE_CD";
     public static final String CPR_EVENT_TYPE_GROUP = "CPR_EVENT_TYPE_CD";
     public static final String CPR_OUTCOME_GROUP = "CPR_OUTCOME_CD";
     public static final String ADMISSION_STATUS_GROUP = "ADMISSION_REQUEST_STATUS_CD";

@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ResourceServiceImpl implements ResourceService {
 
-    // 구역 목록은 admin 공통코드 ZONE_CD(없으면 EmgCodes.ZONE_FALLBACK, Jira UD2-81 기준)
+    // 구역 목록은 admin 공통코드 ER_ZONE_CD(없으면 EmgCodes.ZONE_FALLBACK, Jira UD2-81 기준)
     private static final String UNASSIGNED_ZONE = "UNASSIGNED";
 
     private static final String STATUS_EMPTY = EmgCodes.BED_STATUS_EMPTY;

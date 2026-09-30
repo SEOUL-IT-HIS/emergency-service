@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DispositionServiceImpl implements DispositionService {
 
-    // 코드그룹 DISPOSITION_TYPE_CD (EmgCodes). admin 캐시에 없으면 폴백 사용
+    // 코드그룹 ER_DISPOSITION_TYPE_CD (EmgCodes). admin 캐시에 없으면 폴백 사용
 
     private final DispositionRepository dispositionRepository;
     private final AdmissionRequestRepository admissionRequestRepository;
