@@ -333,13 +333,16 @@ public class CareServiceImpl implements CareService {
         if (windowHours <= 0) {
             throw new IllegalArgumentException("sinceHours must be greater than 0");
         }
-        return activeReceptionsOf(patientId, windowHours).stream().map(intake -> {
+        List<ActiveReceptionDto> result = activeReceptionsOf(patientId, windowHours).stream().map(intake -> {
             ActiveReceptionDto dto = new ActiveReceptionDto();
             dto.setReceptionId(intake.getId());
             dto.setPatientId(intake.getPatientId());
             dto.setReceivedAt(intake.getReceivedAt());
             return dto;
         }).toList();
+        // 접수 서비스가 중복 접수 경고를 위해 호출했는지 확인하는 용도
+        log.info("진행 중인 응급 접수 조회 - patientId={}, 최근 {}시간, 결과 {}건", patientId, windowHours, result.size());
+        return result;
     }
 
     /**
