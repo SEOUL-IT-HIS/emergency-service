@@ -324,6 +324,42 @@ public class CareServiceImpl implements CareService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ActiveReceptionDto> getActiveReceptions(String patientId, Integer sinceHours) {
+        if (!StringUtils.hasText(patientId)) {
+            throw new IllegalArgumentException("patientId is required");
+        }
+        int windowHours = sinceHours == null ? DEFAULT_ACTIVE_WINDOW_HOURS : sinceHours;
+        if (windowHours <= 0) {
+            throw new IllegalArgumentException("sinceHours must be greater than 0");
+        }
+        return activeReceptionsOf(patientId, windowHours).stream().map(intake -> {
+            ActiveReceptionDto dto = new ActiveReceptionDto();
+            dto.setReceptionId(intake.getId());
+            dto.setPatientId(intake.getPatientId());
+            dto.setReceivedAt(intake.getReceivedAt());
+            return dto;
+        }).toList();
+    }
+
+    /**
+     * 같은 환자의 퇴실 처리 전(DischargeProgress 기준) 접수를 접수 시각 오름차순으로.
+     * 접수 후 windowHours 시간이 지난 건은 퇴실 누락·테스트 데이터로 보고 뺀다(접수 시각을 모르면 포함).
+     */
+    private List<ReceptionIntake> activeReceptionsOf(String patientId, int windowHours) {
+        LocalDateTime since = LocalDateTime.now().minusHours(windowHours);
+        List<ReceptionIntake> intakes = receptionIntakeRepository.findByPatientId(patientId).stream()
+                .filter(intake -> intake.getReceivedAt() == null || !intake.getReceivedAt().isBefore(since))
+                .toList();
+        Set<String> done = dischargeProgress.doneReceptionIds(intakes.stream().map(ReceptionIntake::getId).toList());
+        return intakes.stream()
+                .filter(intake -> !done.contains(intake.getId()))
+                .sorted(Comparator.comparing(ReceptionIntake::getReceivedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ReceptionIntake::getId))
+                .toList();
+    }
+
+    @Override
     @Transactional
     public ReceptionIntakeDto createReceptionIntake(ReceptionIntakeCreateRequestDto request) {
         if (!StringUtils.hasText(request.getReceptionId())
@@ -355,6 +391,16 @@ public class CareServiceImpl implements CareService {
         }
 
         ReceptionIntake saved = receptionIntakeRepository.save(intake);
+
+        if (isNew) {
+            // 접수는 거절하지 않고 항상 저장한다(응급 환자를 못 받는 상황이 생기면 안 된다). 같은 환자의 진행 중 접수가 있으면 경고만 남긴다.
+            List<String> others = activeReceptionsOf(saved.getPatientId(), DEFAULT_ACTIVE_WINDOW_HOURS).stream()
+                    .map(ReceptionIntake::getId).filter(id -> !id.equals(saved.getId())).toList();
+            if (!others.isEmpty()) {
+                log.warn("같은 환자의 진행 중인 응급 접수가 이미 있음 - patientId={}, 새 receptionId={}, 기존 receptionId={}",
+                        saved.getPatientId(), saved.getId(), others);
+            }
+        }
 
         ReceptionIntakeDto dto = new ReceptionIntakeDto();
         dto.setReceptionId(saved.getId());
