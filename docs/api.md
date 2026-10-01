@@ -36,6 +36,8 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- | --- |
 | UC-RES-01 | GET | `/api/emergency/resources/congestion` | 구역별 혼잡도(현황판이 사용, 별도 UC 아님) | - |
 | UC-RES-02 | POST | `/api/emergency/resources/bed-assignments` | 병상 배정 | encounterId, bedId |
+| UC-RES-02 | GET | `/api/emergency/resources/bed-assignments/current` | 접수의 현재(해제 안 된) 병상 배정. 없으면 `data=null`. 화면이 새로고침·환자 전환 뒤에도 Release 버튼을 보여주는 용도 | receptionId |
+| UC-RES-02 | PATCH | `/api/emergency/resources/bed-assignments/{assignmentId}/release` | 병상 수동 해제(병상은 EMPTY로). **퇴실 처리가 끝나면(`DischargeProgress` DONE) 응급이 자동으로 해제한다** — 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동 병상 배정(02) 회신, 전원은 소견서 작성 시점. 자동 해제는 해제자 `SYSTEM` | releasedById |
 
 ### 2.3 ER-CARE
 

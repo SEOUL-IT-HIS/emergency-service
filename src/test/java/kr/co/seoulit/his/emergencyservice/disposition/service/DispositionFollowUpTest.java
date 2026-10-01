@@ -15,6 +15,8 @@ import kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionReques
 import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.messaging.AdmissionEventPublisher;
+import kr.co.seoulit.his.emergencyservice.disposition.entity.TransferNote;
+import kr.co.seoulit.his.emergencyservice.resource.service.ResourceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +38,7 @@ class DispositionFollowUpTest {
     private TransferNoteRepository transferNoteRepository;
     private DispositionServiceImpl service;
     private AdmissionEventPublisher publisher;
+    private ResourceService resourceService;
 
     @BeforeEach
     void setUp() {
@@ -54,9 +57,11 @@ class DispositionFollowUpTest {
         transferNoteRepository = mock(TransferNoteRepository.class);
         CommonCodeCache cache = new CommonCodeCache();
         publisher = mock(AdmissionEventPublisher.class);
+        resourceService = mock(ResourceService.class);
         service = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
                 transferNoteRepository, cache, new CommonCodeResolver(cache), publisher,
-                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository));
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository),
+                resourceService);
     }
 
     private Disposition disposition(String id, String typeCode) {
@@ -247,5 +252,80 @@ class DispositionFollowUpTest {
         assertThatThrownBy(() -> service.createAdmissionRequest("d-admit-old", new AdmissionRequestCreateDto()))
                 .isInstanceOf(ConflictException.class).hasMessageContaining("replaced");
         org.mockito.Mockito.verifyNoInteractions(publisher);
+    }
+
+    // ----- 퇴실 완료 시 병상 자동 해제 -----
+
+    /** 저장한 결정이 곧바로 조회되도록(퇴실 완료 판정이 저장 결과를 보게) 저장소를 메모리처럼 동작시킨다 */
+    private void decisionsBehaveLikeAStore() {
+        List<Disposition> store = new java.util.ArrayList<>();
+        when(dispositionRepository.save(any(Disposition.class))).thenAnswer(inv -> {
+            Disposition d = inv.getArgument(0);
+            d.setId("d-saved");
+            store.add(d);
+            return d;
+        });
+        when(dispositionRepository.findByReceptionIdIn(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenAnswer(inv -> List.copyOf(store));
+    }
+
+    @Test
+    void homeDecisionReleasesTheBedsAtOnceButAdmitDoesNot() {
+        decisionsBehaveLikeAStore();
+        service.createDisposition(decide(EmgCodes.DISPOSITION_ADMIT));
+        // 입원은 병동 회신 전이라 아직 응급실 병상을 쥐고 있다
+        org.mockito.Mockito.verify(resourceService, org.mockito.Mockito.never())
+                .releaseBedsOf(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+
+        // 결정 변경(병동 요청 전) -> 귀가는 즉시 완료되므로 병상을 비운다(해제자 SYSTEM)
+        Disposition admit = disposition("d-saved", EmgCodes.DISPOSITION_ADMIT);
+        admit.setReceptionId("r-1");
+        when(dispositionRepository.findByReceptionIdOrderByDecidedAtDesc("r-1")).thenReturn(List.of(admit));
+        service.createDisposition(decide(EmgCodes.DISPOSITION_HOME));
+        org.mockito.Mockito.verify(resourceService).releaseBedsOf("r-1", ResourceService.SYSTEM_ACTOR);
+    }
+
+    @Test
+    void transferNoteReleasesTheBeds() {
+        decided(EmgCodes.DISPOSITION_TRANSFER);
+        List<TransferNote> notes = new java.util.ArrayList<>();
+        when(transferNoteRepository.save(any(TransferNote.class))).thenAnswer(inv -> {
+            TransferNote n = inv.getArgument(0);
+            n.setId("tn-1");
+            notes.add(n);
+            return n;
+        });
+        when(transferNoteRepository.findByDispositionIdIn(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenAnswer(inv -> List.copyOf(notes));
+        TransferNoteCreateDto r = new TransferNoteCreateDto();
+        r.setTargetHospitalCode("01");
+        r.setContent("transfer summary");
+        r.setWrittenById("dr-1");
+
+        service.createTransferNote("d-old", r);
+
+        org.mockito.Mockito.verify(resourceService).releaseBedsOf("r-1", ResourceService.SYSTEM_ACTOR);
+    }
+
+    @Test
+    void wardBedAssignmentReleasesTheBedsButARejectionDoesNot() {
+        Disposition d = decided(EmgCodes.DISPOSITION_ADMIT);
+        AdmissionRequest requested = request(d, EmgCodes.ADMISSION_REQUESTED);
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-old")).thenReturn(List.of(requested));
+        when(admissionRequestRepository.findByDispositionIdIn(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenReturn(List.of(requested));
+
+        service.updateAdmissionStatus("d-old", null, EmgCodes.ADMISSION_REJECTED, null);
+        // 거부되면 아직 응급실에 있다 -> 병상 유지
+        org.mockito.Mockito.verify(resourceService, org.mockito.Mockito.never())
+                .releaseBedsOf(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+
+        AdmissionRequest second = request(d, EmgCodes.ADMISSION_REQUESTED);
+        second.setId("ar-2");
+        when(admissionRequestRepository.findByDispositionIdOrderByRequestedAtDesc("d-old")).thenReturn(List.of(second));
+        when(admissionRequestRepository.findByDispositionIdIn(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenReturn(List.of(second));
+        service.updateAdmissionStatus("d-old", null, EmgCodes.ADMISSION_BED_ASSIGNED, "03");
+        org.mockito.Mockito.verify(resourceService).releaseBedsOf("r-1", ResourceService.SYSTEM_ACTOR);
     }
 }

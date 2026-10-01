@@ -10,6 +10,7 @@ import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.*;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.*;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.*;
+import kr.co.seoulit.his.emergencyservice.resource.service.ResourceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class DispositionServiceImpl implements DispositionService {
     private final CommonCodeResolver codeResolver;
     private final AdmissionEventPublisher admissionEventPublisher;
     private final DischargeProgress dischargeProgress;
+    private final ResourceService resourceService;
 
     @Override
     @Transactional
@@ -67,6 +69,7 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         DispositionDto dto = toDispositionDto(dispositionRepository.save(entity));
+        releaseBedsIfDischarged(entity.getReceptionId());
         // 새 결정은 후속 조치가 없으니 입원·전원이면 아직 바꿀 수 있다(귀가·사망·자의퇴원은 즉시 완료)
         dto.setChangeable(EmgCodes.DISPOSITION_ADMIT.equals(entity.getDispositionTypeCode())
                 || EmgCodes.DISPOSITION_TRANSFER.equals(entity.getDispositionTypeCode()));
@@ -138,6 +141,7 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         TransferNote saved = transferNoteRepository.save(entity);
+        releaseBedsIfDischarged(disposition.getReceptionId());
 
         TransferNoteDto dto = new TransferNoteDto();
         dto.setId(saved.getId());
@@ -231,7 +235,21 @@ public class DispositionServiceImpl implements DispositionService {
             target.setAssignedWardCode(wardCode);
         }
         target.setUpdatedAt(LocalDateTime.now());
+        releaseBedsIfDischarged(target.getDisposition().getReceptionId());
         return toAdmissionDto(target);
+    }
+
+    /**
+     * 퇴실 처리가 끝나면(DischargeProgress 기준 DONE) 응급실 병상을 자동으로 비운다(해제자 SYSTEM, 병상은 EMPTY).
+     * 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동 병상 배정 회신, 전원은 소견서 작성 시점이다.
+     */
+    private void releaseBedsIfDischarged(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            return;
+        }
+        if (dischargeProgress.stage(receptionId) == DischargeProgress.Stage.DONE) {
+            resourceService.releaseBedsOf(receptionId, ResourceService.SYSTEM_ACTOR);
+        }
     }
 
     @Override

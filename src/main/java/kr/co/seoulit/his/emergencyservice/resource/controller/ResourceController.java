@@ -38,6 +38,12 @@ public class ResourceController {
         return ApiResponse.success(resourceService.assignBed(request));
     }
 
+    @Operation(summary = "접수의 현재 병상 배정 조회", description = "UC-RES-02 · 해제 안 된 배정(없으면 data=null). 화면이 새로고침 뒤에도 Release 를 보여주는 용도")
+    @GetMapping("/bed-assignments/current")
+    public ApiResponse<BedAssignmentDto> getCurrentAssignment(@RequestParam String receptionId) {
+        return ApiResponse.success(resourceService.getCurrentAssignment(receptionId));
+    }
+
     @Operation(summary = "구역-병상 배정 해제", description = "UC-RES-02 · 병상 해제 (환자 퇴실/전실 시)")
     @PatchMapping("/bed-assignments/{assignmentId}/release")
     public ApiResponse<BedAssignmentDto> releaseBed(

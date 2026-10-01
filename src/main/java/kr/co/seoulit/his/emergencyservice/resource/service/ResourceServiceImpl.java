@@ -201,14 +201,56 @@ public class ResourceServiceImpl implements ResourceService {
         if (assignment.getReleasedAt() != null) {
             throw new ConflictException("bed assignment already released: " + assignmentId);
         }
-        assignment.setReleasedById(request.getReleasedById());
-        assignment.setReleasedAt(LocalDateTime.now());
-        assignment.setUpdatedAt(LocalDateTime.now());
+        applyRelease(assignment, request.getReleasedById());
+        Bed bed = assignment.getBed();
 
+        BedAssignmentDto dto = new BedAssignmentDto();
+        dto.setId(assignment.getId());
+        dto.setReceptionId(assignment.getReceptionId());
+        dto.setBedId(bed.getId());
+        dto.setBedNo(bed.getBedNo());
+        dto.setZoneCode(bed.getZoneCode());
+        dto.setAssignedById(assignment.getAssignedById());
+        dto.setAssignedAt(assignment.getAssignedAt());
+        dto.setReleasedById(assignment.getReleasedById());
+        dto.setReleasedAt(assignment.getReleasedAt());
+        return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BedAssignmentDto getCurrentAssignment(String receptionId) {
+        if (!StringUtils.hasText(receptionId)) {
+            throw new IllegalArgumentException("receptionId is required");
+        }
+        return bedAssignmentRepository.findActiveWithBedByReceptionId(receptionId).stream().findFirst()
+                .map(this::toAssignmentDto).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public int releaseBedsOf(String receptionId, String releasedById) {
+        if (!StringUtils.hasText(receptionId)) {
+            return 0;
+        }
+        List<BedAssignment> active = bedAssignmentRepository.findActiveWithBedByReceptionId(receptionId);
+        active.forEach(assignment -> applyRelease(assignment, releasedById));
+        return active.size();
+    }
+
+    /** 배정을 해제하고 그 병상을 비어 있음(EMPTY)으로 되돌린다. */
+    private void applyRelease(BedAssignment assignment, String releasedById) {
+        LocalDateTime now = LocalDateTime.now();
+        assignment.setReleasedById(releasedById);
+        assignment.setReleasedAt(now);
+        assignment.setUpdatedAt(now);
         Bed bed = assignment.getBed();
         bed.setBedStatusCode(STATUS_EMPTY);
-        bed.setUpdatedAt(LocalDateTime.now());
+        bed.setUpdatedAt(now);
+    }
 
+    private BedAssignmentDto toAssignmentDto(BedAssignment assignment) {
+        Bed bed = assignment.getBed();
         BedAssignmentDto dto = new BedAssignmentDto();
         dto.setId(assignment.getId());
         dto.setReceptionId(assignment.getReceptionId());

@@ -183,7 +183,7 @@ sequenceDiagram
 - 병상 **가용 여부 조회**(`GET`, IPT)는 이 이벤트 흐름과 별개로 계속 **동기 REST 유지** — 쓰기 없음, 참고용 사전 체크.
 - 응급이 병동 자원에 직접 쓰기(배정)하는 경로는 없음 — 병상 예약·배정 쓰기는 IPT 소유.
 - 응급은 병동의 API 주소를 몰라도 됨 — 토픽 이름과 메시지 스펙만 계약(contract)으로 관리.
-- 응급에게 최종 결과(`BED_ASSIGNED`/`ADMISSION_REJECTED`) 회신은 필요 — 응급 의료진이 병동 수용 여부를 알아야 환자를 올려보낼 수 있다. 응답을 받아도 응급은 퇴실 처리·응급실 병상 반납을 **자동으로 하지 않는다**(응급실 병상은 기존 병상 해제 `PATCH /resources/bed-assignments/{id}/release`로 직접 처리, 병동 병상은 병동 소유라 응급이 건드리지 않음).
+- 응급에게 최종 결과(`BED_ASSIGNED`/`ADMISSION_REJECTED`) 회신은 필요 — 응급 의료진이 병동 수용 여부를 알아야 환자를 올려보낼 수 있다. 응답을 받으면 입원 환자는 퇴실 처리 완료(DONE)가 되고, **이때 응급실 병상은 자동으로 해제된다**(해제자 `SYSTEM`, 병상 EMPTY — 귀가·사망·자의퇴원은 결정 즉시, 전원은 소견서 작성 시점도 같다). 병동 병상은 병동 소유라 응급이 건드리지 않는다. 자동 해제 전에 수동으로 비우려면 `PATCH /resources/bed-assignments/{id}/release`, 현재 배정은 `GET /resources/bed-assignments/current?receptionId=`로 조회한다.
 
 ---
 

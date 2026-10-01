@@ -15,4 +15,9 @@ public interface BedAssignmentRepository extends JpaRepository<BedAssignment, St
     @Query("SELECT ba FROM BedAssignment ba JOIN FETCH ba.bed "
             + "WHERE ba.receptionId IN :receptionIds AND ba.releasedAt IS NULL")
     List<BedAssignment> findActiveWithBedByReceptionIdIn(@Param("receptionIds") Collection<String> receptionIds);
+
+    // 한 접수의 현재 배정(병상 포함) — 퇴실 완료 시 자동 해제, 화면의 현재 배정 조회에 쓴다.
+    @Query("SELECT ba FROM BedAssignment ba JOIN FETCH ba.bed "
+            + "WHERE ba.receptionId = :receptionId AND ba.releasedAt IS NULL ORDER BY ba.assignedAt DESC")
+    List<BedAssignment> findActiveWithBedByReceptionId(@Param("receptionId") String receptionId);
 }
