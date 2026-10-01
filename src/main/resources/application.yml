@@ -23,6 +23,7 @@ app:
       - http://localhost:3000
       - http://127.0.0.1:3000
       - http://117.16.154.233:18080
+      - http://seoulit.pe.kr:18080
       - http://localhost:18080
   admin:
     # admin-service 공통코드 API base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.128:8080
