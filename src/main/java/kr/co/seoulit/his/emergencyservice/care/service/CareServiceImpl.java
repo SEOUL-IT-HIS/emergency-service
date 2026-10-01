@@ -60,9 +60,12 @@ public class CareServiceImpl implements CareService {
         // 순회 기준 = ReceptionIntake(접수). 접수만 되어있으면 KTAS 전이라도 목록에 뜬다.
         // 날짜·상태 조건을 먼저 걸러서, 아래 조회들이 화면에 나갈 접수만 대상으로 하게 한다.
         LocalDate filterDate = StringUtils.hasText(date) ? LocalDate.parse(date) : null;
+        // 목록은 접수 순서(먼저 접수한 환자 먼저)로 내린다. findAll()은 순서를 보장하지 않고, 접수ID는 UUID라 순서와 무관하다.
         List<ReceptionIntake> dated = receptionIntakeRepository.findAll().stream()
                 .filter(intake -> filterDate == null || (intake.getReceivedAt() != null
                         && intake.getReceivedAt().toLocalDate().equals(filterDate)))
+                .sorted(Comparator.comparing(ReceptionIntake::getReceivedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ReceptionIntake::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
         // 퇴실 처리 완료 기준은 DischargeProgress 하나로 통일(현황판·장기체류 알림과 같은 기준)
         Set<String> doneReceptionIds = dischargeProgress.doneReceptionIds(

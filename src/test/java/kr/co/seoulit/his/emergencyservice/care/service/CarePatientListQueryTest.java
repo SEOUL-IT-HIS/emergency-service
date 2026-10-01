@@ -101,6 +101,21 @@ class CarePatientListQueryTest {
     }
 
     @Test
+    void patientsAreListedInReceptionOrderRegardlessOfRepositoryOrder() {
+        LocalDateTime base = LocalDateTime.of(2026, 10, 1, 9, 0);
+        // 저장소가 접수ID 순서도 접수 순서도 아닌 임의 순서로 돌려줘도
+        when(receptionIntakeRepository.findAll()).thenReturn(List.of(
+                intake("zzz", base.plusMinutes(2)), intake("aaa", base.plusMinutes(3)),
+                intake("mmm", base.plusMinutes(1)), intake("nodate", null)));
+
+        List<EmergencyPatientDto> result = service.getPatients(null, null);
+
+        // 접수 시각 오름차순, 접수 시각이 없는 건은 맨 뒤
+        assertThat(result).extracting(EmergencyPatientDto::getReceptionId)
+                .containsExactly("mmm", "zzz", "aaa", "nodate");
+    }
+
+    @Test
     void dateFilterIsAppliedBeforeTheBatchLookups() {
         List<EmergencyPatientDto> result = service.getPatients("2026-10-01", null);
 
