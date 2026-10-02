@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 public class MarDto {
     private String id;
     private String receptionId;
-    private Long orderId;
-    private Long orderItemId;
+    private String orderId;
+    private String orderItemId;
     private String drugCode;
     private String dose;
     private String routeCode;

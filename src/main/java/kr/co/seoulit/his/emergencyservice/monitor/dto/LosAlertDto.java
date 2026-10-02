@@ -9,6 +9,9 @@ import java.time.LocalDateTime;
 public class LosAlertDto {
     private String id;
     private String receptionId;
+    private String patientName;
     private Integer thresholdMinutes;
     private LocalDateTime triggeredAt;
+    private String acknowledgedById;
+    private LocalDateTime acknowledgedAt;
 }

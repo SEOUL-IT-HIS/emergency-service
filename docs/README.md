@@ -30,12 +30,12 @@ HIS(병원정보시스템) MSA 중 **응급(EMG)** 도메인을 담당하는 Spr
 **EMG가 소유(Provider)**
 
 - KTAS·활력징후·격리·위험 스크리닝
-- 구역/병상/의료기기 배정
-- 진료기록·처치·MAR·CPR
+- 구역/병상 배정, 구역별 혼잡도
+- 진료기록·처치·MAR·CPR, 동의 기록(종이 동의서 수령 사실)
 - 현황판·장기체류 알림
-- 퇴실·전원·이송 기록
-- 응급 전용 업무코드
-- 협진·당직 채널 요청(처방 원장 아님)
+- 퇴실·전원 소견서
+
+> 범위 제외(2026-09-30): 협진·당직·수술 긴급 요청, 외부 병원 전원 정보, 의료기기 할당, 구급차 이송 기록, 응급 전용 업무코드
 
 **EMG가 소비(Consumer)**
 
@@ -65,12 +65,10 @@ HIS(병원정보시스템) MSA 중 **응급(EMG)** 도메인을 담당하는 Spr
 kr.co.seoulit.his.emergencyservice
 ├── common/          ApiResponse, CorsConfig, ExceptionHandler
 ├── triage/          상태평가 API
-├── resource/        병상·기기
-├── care/            진료·MAR·CPR
-├── channel/         협진·당직
+├── resource/        병상·혼잡도
+├── care/            진료·MAR·CPR·동의 기록
 ├── monitor/         현황판·LOS
-├── disposition/     퇴실·전원
-└── code/            응급 업무코드
+└── disposition/     퇴실·전원 소견서
 ```
 
 각 도메인: `controller` → `service`/`ServiceImpl` → `repository` + `entity` + `dto` (+ MapStruct `mapper`)

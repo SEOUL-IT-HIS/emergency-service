@@ -3,6 +3,7 @@ package kr.co.seoulit.his.emergencyservice.triage;
 import kr.co.seoulit.his.emergencyservice.triage.entity.TriageAssessment;
 import kr.co.seoulit.his.emergencyservice.triage.repository.TriageAssessmentRepository;
 import lombok.RequiredArgsConstructor;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -30,16 +31,16 @@ public class TriageAssessmentSeeder implements CommandLineRunner {
             return;
         }
 
-        save("ER-20260716-001", "2", "흉통, EMS 이송(활력징후 불안정)", LocalDateTime.now().minusMinutes(12));
-        save("ER-20260716-002", "4", "경미한 열상, EMS 이송(활력징후 안정)", LocalDateTime.now().minusMinutes(30));
-        save("ER-20260716-003", "1", "호흡곤란, 보호자 동반 내원(EMS 미이송)", LocalDateTime.now().minusMinutes(5));
+        save("ER-20260716-001", "02", "흉통, EMS 이송(활력징후 불안정)", LocalDateTime.now().minusMinutes(12));
+        save("ER-20260716-002", "04", "경미한 열상, EMS 이송(활력징후 안정)", LocalDateTime.now().minusMinutes(30));
+        save("ER-20260716-003", "01", "호흡곤란, 보호자 동반 내원(EMS 미이송)", LocalDateTime.now().minusMinutes(5));
     }
 
     private void save(String receptionId, String ktasLevelCode, String reason, LocalDateTime assessedAt) {
         TriageAssessment assessment = new TriageAssessment();
         assessment.setReceptionId(receptionId);
         assessment.setKtasLevelCode(ktasLevelCode);
-        assessment.setAssessmentTypeCode("INITIAL");
+        assessment.setAssessmentTypeCode(EmgCodes.ASSESSMENT_INITIAL);
         assessment.setAssessedById("E0001");
         assessment.setAssessedAt(assessedAt);
         assessment.setReason(reason);

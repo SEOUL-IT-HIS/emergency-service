@@ -46,7 +46,7 @@ public class AdminCommonCodeClient {
     }
 
     /** GET /api/commonCodeItem/list?groupId= — 그룹별 항목 목록 */
-    public List<AdminCommonCodeItemDto> getItems(Long groupId) {
+    public List<AdminCommonCodeItemDto> getItems(String groupId) {
         String url = UriComponentsBuilder.fromUriString(adminBaseUrl + "/api/commonCodeItem/list")
                 .queryParam("groupId", groupId)
                 .toUriString();

@@ -13,7 +13,7 @@ import lombok.Setter;
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AdminCommonCodeGroupDto {
-    private Long groupId;
+    private String groupId;
     private String groupCode;
     private String groupName;
     private String useYn;

@@ -13,8 +13,8 @@ import lombok.Setter;
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AdminCommonCodeItemDto {
-    private Long codeId;
-    private Long groupId;
+    private String codeId;
+    private String groupId;
     private String codeValue;
     private String codeName;
     private String useYn;

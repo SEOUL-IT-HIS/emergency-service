@@ -28,6 +28,10 @@ public class AdmissionRequest {
     @Column(name = "REQUEST_STATUS_CODE", length = 20)
     private String requestStatusCode;
 
+    /** 병동이 실제로 배정한 병동(BED_ASSIGNED 회신의 wardCode, WARD_CD 값). 희망 병동(wardPref)과 다를 수 있다 */
+    @Column(name = "ASSIGNED_WARD_CODE", length = 20)
+    private String assignedWardCode;
+
     @Column(name = "REQUESTED_AT")
     private LocalDateTime requestedAt;
 

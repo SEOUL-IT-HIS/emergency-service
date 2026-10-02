@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 @Setter
 public class MarCreateRequestDto {
     private String encounterId;
-    private Long orderId;
-    private Long orderItemId;
+    private String orderId;
+    private String orderItemId;
     private String drugCode;
     private String dose;
     private String routeCode;
