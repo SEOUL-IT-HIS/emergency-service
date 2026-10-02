@@ -27,7 +27,11 @@ public class OrderCorePrescription {
     private String orderMethod;
     private String priorityCode;
     private String timingCode;
+    /** 처방방법 이름(예: 01 → Electronic) — 처방코어가 코드와 함께 내려준다 */
+    private String orderMethodName;
     private String verbalYn;
+    private String verbalConfirmedAt;
+    private String verbalConfirmedBy;
     private List<OrderItemDto> items;
     /** 목록 조회(receptionId)에서 내려오는 전송 상태 요약. 약제는 처방 단위(PENDING/SENT/FAILED) */
     private String pharmacySendStatus;

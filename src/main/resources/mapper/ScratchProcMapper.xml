@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.seoulit.his.emergencyservice.scratch.mapper.ScratchProcMapper">
+
+    <!-- 학습용: EMERGENCY.PROC_COUNT_EMS_REFERRAL 프로시저 호출 -->
+    <select id="countEmsReferralByReceptionId" statementType="CALLABLE" parameterType="map">
+        {
+            CALL EMERGENCY.PROC_COUNT_EMS_REFERRAL(
+                #{receptionId, mode=IN, jdbcType=VARCHAR},
+                #{count, mode=OUT, jdbcType=NUMERIC}
+            )
+        }
+    </select>
+
+</mapper>

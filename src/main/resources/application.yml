@@ -36,8 +36,8 @@ app:
     base-url: ${ORDER_BASE_URL:http://localhost:8088}
     # 응급의학과 코드(ADM DEPT_CD)
     department-code: "10"
-    # 처방코어가 verbalYn 을 지원하면 true (그때까지 구두처방도 일반 처방으로 등록한다)
-    forward-verbal-yn: false
+    # 구두처방 verbalYn(Y/N)을 처방코어로 전달한다(2026-10-02 처방코어 안내). 문제가 생기면 false 로 끈다
+    forward-verbal-yn: true
   kafka:
     # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
     intake:

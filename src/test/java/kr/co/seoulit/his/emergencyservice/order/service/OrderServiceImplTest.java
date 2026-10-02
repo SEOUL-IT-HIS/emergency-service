@@ -8,12 +8,15 @@ import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
+import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreLabItem;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
+import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderItemDto;
+import kr.co.seoulit.his.emergencyservice.order.dto.OrderVerbalConfirmRequestDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,7 +58,20 @@ class OrderServiceImplTest {
         created.setPrescriptionId(ORDER_ID);
         created.setStatus("ACTIVE");
         when(client.create(anyString(), any(OrderCoreCreateRequest.class))).thenReturn(created);
+        // 전송 직후 처방코어에서 다시 읽는 실제 상태 — 기본은 검사·약제 모두 전송 완료
+        when(client.get(ORDER_ID)).thenReturn(afterDispatch("SENT", "SENT"));
         service = newService(false);
+    }
+
+    /** 전송 직후의 처방: 검사 항목 하나(sendStatus)와 약제 전송 상태 */
+    private OrderCorePrescription afterDispatch(String labItemStatus, String pharmacyStatus) {
+        OrderItemDto labItem = lab();
+        labItem.setSendStatus(labItemStatus);
+        OrderCorePrescription p = new OrderCorePrescription();
+        p.setPrescriptionId(ORDER_ID);
+        p.setItems(List.of(labItem, drug()));
+        p.setPharmacySendStatus(pharmacyStatus);
+        return p;
     }
 
     private OrderServiceImpl newService(boolean forwardVerbalYn) {
@@ -169,24 +185,87 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void verbalOrderIsRegisteredAsAnOrdinaryOrderUntilTheOrderCoreSupportsIt() {
+    void verbalOrderIsRegisteredWithTheVerbalMethodAndVerbalYnIsForwarded() {
+        OrderServiceImpl forwarding = newService(true);
         OrderCreateRequestDto verbal = request(drug());
         verbal.setVerbalYn("Y");
 
-        OrderDto dto = service.createOrder(verbal);
+        OrderDto dto = forwarding.createOrder(verbal);
+        forwarding.createOrder(request(drug()));          // 구두가 아닌 일반 처방
+
+        ArgumentCaptor<OrderCoreCreateRequest> captor = ArgumentCaptor.forClass(OrderCoreCreateRequest.class);
+        verify(client, org.mockito.Mockito.times(2)).create(eq(RECEPTION_ID), captor.capture());
+        OrderCoreCreateRequest verbalBody = captor.getAllValues().get(0);
+        assertThat(verbalBody.getOrderMethod()).isEqualTo("02");           // 구두처방
+        assertThat(verbalBody.getVerbalYn()).isEqualTo("Y");
+        OrderCoreCreateRequest ordinaryBody = captor.getAllValues().get(1);
+        assertThat(ordinaryBody.getOrderMethod()).isEqualTo("01");         // 전자처방
+        assertThat(ordinaryBody.getVerbalYn()).isEqualTo("N");
+        assertThat(dto.getVerbalYn()).isEqualTo("Y");
+    }
+
+    @Test
+    void verbalYnCanBeSwitchedOffButTheVerbalMethodStillGoesOut() {
+        OrderCreateRequestDto verbal = request(drug());
+        verbal.setVerbalYn("Y");
+
+        service.createOrder(verbal);                                        // setUp 의 service 는 verbalYn 전달을 끈 상태
 
         ArgumentCaptor<OrderCoreCreateRequest> captor = ArgumentCaptor.forClass(OrderCoreCreateRequest.class);
         verify(client).create(eq(RECEPTION_ID), captor.capture());
-        assertThat(captor.getValue().getVerbalYn()).isNull();             // 아직 전달하지 않는다
-        assertThat(captor.getValue().getOrderMethod()).isEqualTo("01");
-        assertThat(dto.getVerbalYn()).isEqualTo("Y");                     // 요청 표시는 응답에 남는다
+        assertThat(captor.getValue().getVerbalYn()).isNull();
+        assertThat(captor.getValue().getOrderMethod()).isEqualTo("02");
+    }
 
-        // 처방코어가 지원하면 설정으로 켠다
-        OrderServiceImpl forwarding = newService(true);
-        forwarding.createOrder(verbal);
-        ArgumentCaptor<OrderCoreCreateRequest> second = ArgumentCaptor.forClass(OrderCoreCreateRequest.class);
-        verify(client, org.mockito.Mockito.times(2)).create(eq(RECEPTION_ID), second.capture());
-        assertThat(second.getAllValues().get(1).getVerbalYn()).isEqualTo("Y");
+    @Test
+    void confirmingAVerbalOrderCallsTheOrderCoreAndReturnsTheConfirmedState() {
+        OrderCorePrescription confirmed = new OrderCorePrescription();
+        confirmed.setPrescriptionId(ORDER_ID);
+        confirmed.setVerbalYn("Y");
+        confirmed.setVerbalConfirmedBy("dr-9");
+        confirmed.setVerbalConfirmedAt("2026-10-02T12:00:00");
+        confirmed.setOrderMethodName("Verbal");
+        when(client.get(ORDER_ID)).thenReturn(confirmed);
+        OrderVerbalConfirmRequestDto request = new OrderVerbalConfirmRequestDto();
+        request.setConfirmedBy("dr-9");
+
+        OrderDto dto = service.confirmVerbalOrder(ORDER_ID, request);
+
+        verify(client).verbalConfirm(ORDER_ID, "dr-9");
+        assertThat(dto.getVerbalConfirmedBy()).isEqualTo("dr-9");
+        assertThat(dto.getVerbalConfirmedAt()).isEqualTo("2026-10-02T12:00:00");
+        assertThat(dto.getOrderMethodName()).isEqualTo("Verbal");
+    }
+
+    @Test
+    void confirmNeedsADoctorAndSucceedsEvenIfTheFollowUpReadFails() {
+        assertThatThrownBy(() -> service.confirmVerbalOrder(ORDER_ID, new OrderVerbalConfirmRequestDto()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("confirmedBy");
+        verify(client, never()).verbalConfirm(anyString(), anyString());
+
+        when(client.get(ORDER_ID)).thenThrow(new ExternalServiceException("down"));
+        OrderVerbalConfirmRequestDto request = new OrderVerbalConfirmRequestDto();
+        request.setConfirmedBy("dr-9");
+        OrderDto dto = service.confirmVerbalOrder(ORDER_ID, request);
+        verify(client).verbalConfirm(ORDER_ID, "dr-9");
+        assertThat(dto.getVerbalConfirmedBy()).isEqualTo("dr-9");
+    }
+
+    @Test
+    void labItemSearchPassesTheContractFieldsThrough() {
+        OrderCoreLabItem cbc = new OrderCoreLabItem();
+        cbc.setItemCode("LAB001");
+        cbc.setItemName("CBC");
+        cbc.setTestClassification("GENERAL");
+        cbc.setSpecimenTypes(List.of("BLOOD"));
+        when(client.searchLabItems("cb")).thenReturn(List.of(cbc));
+
+        List<LabItemDto> items = service.searchLabItems("cb");
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).getItemCode()).isEqualTo("LAB001");
+        assertThat(items.get(0).getTestClassification()).isEqualTo("GENERAL");
+        assertThat(items.get(0).getSpecimenTypes()).containsExactly("BLOOD");
     }
 
     @Test
@@ -292,5 +371,47 @@ class OrderServiceImplTest {
         assertThatThrownBy(() -> service.listOrders(" ")).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("encounterId");
         verifyNoInteractions(client);
+    }
+
+    @Test
+    void dispatchReportsTheRealStateEvenWhenTheOrderCoreAnswers200ButTheLabTransferFailed() {
+        when(client.get(ORDER_ID)).thenReturn(afterDispatch("FAILED", "PENDING"));
+
+        OrderDispatchDto lab = service.dispatchLab(ORDER_ID);
+        OrderDispatchDto pharmacy = service.dispatchPharmacy(ORDER_ID);
+
+        assertThat(lab.getStatus()).isEqualTo("FAILED");      // 호출은 성공했지만 검사 쪽으로 못 넘김
+        assertThat(pharmacy.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void dispatchStatusIsPendingWhileSomeLabItemIsNotSentAndRequestedWhenTheStateCannotBeRead() {
+        OrderItemDto sent = lab();
+        sent.setSendStatus("SENT");
+        OrderItemDto waiting = lab();
+        waiting.setItemCode("LAB002");
+        waiting.setSendStatus(null);
+        OrderCorePrescription mixed = new OrderCorePrescription();
+        mixed.setPrescriptionId(ORDER_ID);
+        mixed.setItems(List.of(sent, waiting));
+        when(client.get(ORDER_ID)).thenReturn(mixed);
+        assertThat(service.dispatchLab(ORDER_ID).getStatus()).isEqualTo("PENDING");
+
+        when(client.get(ORDER_ID)).thenThrow(new ExternalServiceException("down"));
+        assertThat(service.dispatchLab(ORDER_ID).getStatus()).isEqualTo("REQUESTED");
+        verify(client, org.mockito.Mockito.times(2)).dispatchLab(ORDER_ID);     // 두 번 모두 전송 호출은 했다
+    }
+
+    @Test
+    void dispatchNowAtRegistrationAlsoReportsTheRealLabState() {
+        when(client.get(ORDER_ID)).thenReturn(afterDispatch("FAILED", "SENT"));
+        OrderCreateRequestDto both = request(lab(), drug());
+        both.setDispatchNow(true);
+
+        OrderDto dto = service.createOrder(both);
+
+        assertThat(dto.getOrderId()).isEqualTo(ORDER_ID);
+        assertThat(dto.getLabDispatchStatus()).isEqualTo("FAILED");
+        assertThat(dto.getPharmacyDispatchStatus()).isEqualTo("SENT");
     }
 }

@@ -8,11 +8,13 @@ import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
+import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderItemDto;
+import kr.co.seoulit.his.emergencyservice.order.dto.OrderVerbalConfirmRequestDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,8 +30,8 @@ import java.util.Set;
  * 요청의 patientId·serviceType("ER")·departmentCode·orderMethod 는 응급 서버가 채우고, 우선순위·시점 코드는 호출 전에 검증한다
  * (처방코어는 잘못된 코드도 그대로 저장하므로).
  *
- * 구두처방: 지금은 일반 처방(orderMethod 01)으로 등록만 된다. 처방코어가 verbalYn·확정 API 를 내놓으면
- * app.order.forward-verbal-yn=true 로 켜고 확정 호출을 붙인다.
+ * 구두처방: verbalYn=Y 이면 orderMethod 02(구두)로 등록하고 verbalYn 도 처방코어로 전달한다. 사후 확정은
+ * PATCH …/verbal-confirm?confirmedBy= (확정 일시·확정 의사 기록). app.order.forward-verbal-yn 으로 verbalYn 전달을 끌 수 있다.
  */
 @Slf4j
 @Service
@@ -41,12 +43,16 @@ public class OrderServiceImpl implements OrderService {
 
     /** 처방코어가 이 값을 ER 채널 구분에 쓴다 — 다른 값이면 외래(OPD)로 처리되므로 고정한다 */
     static final String SERVICE_TYPE_ER = "ER";
-    /** ORDER_METHOD_CD 가 확정되기 전까지 처방코어가 정한 값(01 EMR) */
-    static final String ORDER_METHOD_EMR = "01";
+    /** 처방방법 코드(ADM ORDER_METHOD_CD, 2026-10-02 확정): 01 전자처방 / 02 구두처방 / 03 전화처방 */
+    static final String ORDER_METHOD_ELECTRONIC = "01";
+    static final String ORDER_METHOD_VERBAL = "02";
 
     static final String DISPATCH_SENT = "SENT";
     static final String DISPATCH_FAILED = "FAILED";
+    static final String DISPATCH_PENDING = "PENDING";
     static final String DISPATCH_NOT_APPLICABLE = "NOT_APPLICABLE";
+    /** 전송을 요청했지만 그 뒤 실제 상태를 읽지 못했다 */
+    static final String DISPATCH_REQUESTED = "REQUESTED";
 
     private final OrderCoreClient orderCoreClient;
     private final ReceptionIntakeRepository receptionIntakeRepository;
@@ -57,7 +63,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderServiceImpl(OrderCoreClient orderCoreClient, ReceptionIntakeRepository receptionIntakeRepository,
                             CommonCodeResolver codeResolver,
                             @Value("${app.order.department-code:10}") String departmentCode,
-                            @Value("${app.order.forward-verbal-yn:false}") boolean forwardVerbalYn) {
+                            @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn) {
         this.orderCoreClient = orderCoreClient;
         this.receptionIntakeRepository = receptionIntakeRepository;
         this.codeResolver = codeResolver;
@@ -81,13 +87,11 @@ public class OrderServiceImpl implements OrderService {
         body.setPrescribedBy(request.getPrescribedBy());
         body.setDepartmentCode(departmentCode);
         body.setServiceType(SERVICE_TYPE_ER);
-        body.setOrderMethod(ORDER_METHOD_EMR);
+        body.setOrderMethod(verbal ? ORDER_METHOD_VERBAL : ORDER_METHOD_ELECTRONIC);
         body.setPriorityCode(request.getPriorityCode());
         body.setTimingCode(request.getTimingCode());
-        if (verbal && forwardVerbalYn) {
-            body.setVerbalYn("Y");
-        } else if (verbal) {
-            log.info("구두처방(verbalYn=Y)이지만 처방코어가 아직 지원하지 않아 일반 처방으로 등록한다 - receptionId={}", receptionId);
+        if (forwardVerbalYn) {
+            body.setVerbalYn(verbal ? "Y" : "N");
         }
         body.setItems(request.getItems().stream().map(item -> toCoreItem(item, request.getPriorityCode())).toList());
 
@@ -130,6 +134,39 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<LabItemDto> searchLabItems(String name) {
+        return orderCoreClient.searchLabItems(name).stream().map(core -> {
+            LabItemDto dto = new LabItemDto();
+            dto.setItemCode(core.getItemCode());
+            dto.setItemName(core.getItemName());
+            dto.setTestClassification(core.getTestClassification());
+            dto.setSpecimenTypes(core.getSpecimenTypes());
+            return dto;
+        }).toList();
+    }
+
+    @Override
+    public OrderDto confirmVerbalOrder(String orderId, OrderVerbalConfirmRequestDto request) {
+        requireOrderId(orderId);
+        if (request == null || !StringUtils.hasText(request.getConfirmedBy())) {
+            throw new IllegalArgumentException("confirmedBy is required");
+        }
+        orderCoreClient.verbalConfirm(orderId, request.getConfirmedBy());
+        log.info("구두처방 확정 - orderId={}, confirmedBy={}", orderId, request.getConfirmedBy());
+        try {
+            return toDto(orderCoreClient.get(orderId));
+        } catch (RuntimeException e) {
+            // 확정은 끝났다. 최신 상태를 못 읽어도 확정 결과 자체는 성공으로 돌려준다
+            log.warn("구두 확정 뒤 처방 조회에 실패했다 - orderId={}, {}", orderId, e.getMessage());
+            OrderDto dto = new OrderDto();
+            dto.setOrderId(orderId);
+            dto.setVerbalYn("Y");
+            dto.setVerbalConfirmedBy(request.getConfirmedBy());
+            return dto;
+        }
+    }
+
+    @Override
     public OrderDto getOrder(String orderId) {
         requireOrderId(orderId);
         return toDto(orderCoreClient.get(orderId));
@@ -159,14 +196,14 @@ public class OrderServiceImpl implements OrderService {
     public OrderDispatchDto dispatchLab(String orderId) {
         requireOrderId(orderId);
         orderCoreClient.dispatchLab(orderId);
-        return dispatched(orderId, "LAB");
+        return dispatched(orderId, "LAB", sendStatusAfterDispatch(orderId, true));
     }
 
     @Override
     public OrderDispatchDto dispatchPharmacy(String orderId) {
         requireOrderId(orderId);
         orderCoreClient.dispatchPharmacy(orderId);
-        return dispatched(orderId, "PHARMACY");
+        return dispatched(orderId, "PHARMACY", sendStatusAfterDispatch(orderId, false));
     }
 
     // ---------------------------------------------------------------- 내부
@@ -214,7 +251,7 @@ public class OrderServiceImpl implements OrderService {
             } else {
                 orderCoreClient.dispatchPharmacy(orderId);
             }
-            return DISPATCH_SENT;
+            return sendStatusAfterDispatch(orderId, lab);
         } catch (RuntimeException e) {
             log.warn("등록 직후 {} 전송 실패 - orderId={}, {}", lab ? "검사" : "약제", orderId, e.getMessage());
             return DISPATCH_FAILED;
@@ -243,6 +280,9 @@ public class OrderServiceImpl implements OrderService {
         dto.setEncounterId(core.getReceptionId());
         dto.setStatus(core.getStatus());
         dto.setOrderMethod(core.getOrderMethod());
+        dto.setOrderMethodName(core.getOrderMethodName());
+        dto.setVerbalConfirmedAt(core.getVerbalConfirmedAt());
+        dto.setVerbalConfirmedBy(core.getVerbalConfirmedBy());
         dto.setPriorityCode(core.getPriorityCode());
         dto.setTimingCode(core.getTimingCode());
         dto.setVerbalYn(core.getVerbalYn());
@@ -256,12 +296,41 @@ public class OrderServiceImpl implements OrderService {
         return dto;
     }
 
-    private OrderDispatchDto dispatched(String orderId, String target) {
+    private OrderDispatchDto dispatched(String orderId, String target, String status) {
         OrderDispatchDto dto = new OrderDispatchDto();
         dto.setOrderId(orderId);
         dto.setTarget(target);
-        dto.setStatus(DISPATCH_SENT);
+        dto.setStatus(status);
         return dto;
+    }
+
+    /**
+     * 전송 호출이 성공(HTTP 2xx)해도 처방코어가 검사·약제 쪽으로 실제로 넘겼는지는 별개다 — 실서버 확인에서
+     * dispatch-lab 이 200 을 주고도 검사 항목이 FAILED 로 남는 경우가 있었다. 그래서 호출 직후 처방을 다시 읽어
+     * 실제 전송 상태를 돌려준다(읽지 못하면 REQUESTED).
+     */
+    private String sendStatusAfterDispatch(String orderId, boolean lab) {
+        try {
+            OrderCorePrescription current = orderCoreClient.get(orderId);
+            String status = lab ? labSendStatusOf(current) : current.getPharmacySendStatus();
+            return StringUtils.hasText(status) ? status : DISPATCH_REQUESTED;
+        } catch (RuntimeException e) {
+            log.warn("전송 뒤 처방 상태를 읽지 못했다 - orderId={}, {}", orderId, e.getMessage());
+            return DISPATCH_REQUESTED;
+        }
+    }
+
+    /** 검사 항목 전송 상태 요약: 하나라도 FAILED면 FAILED, 전부 SENT가 아니면 PENDING, 전부 SENT면 SENT, 검사 항목이 없으면 null */
+    static String labSendStatusOf(OrderCorePrescription prescription) {
+        List<OrderItemDto> labItems = prescription.getItems() == null ? List.of()
+                : prescription.getItems().stream().filter(item -> TYPE_LAB.equals(item.getPrescriptionType())).toList();
+        if (labItems.isEmpty()) {
+            return null;
+        }
+        if (labItems.stream().anyMatch(item -> DISPATCH_FAILED.equals(item.getSendStatus()))) {
+            return DISPATCH_FAILED;
+        }
+        return labItems.stream().allMatch(item -> DISPATCH_SENT.equals(item.getSendStatus())) ? DISPATCH_SENT : DISPATCH_PENDING;
     }
 
     private void requireOrderId(String orderId) {

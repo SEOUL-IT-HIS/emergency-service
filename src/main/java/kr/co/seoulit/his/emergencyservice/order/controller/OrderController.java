@@ -3,10 +3,12 @@ package kr.co.seoulit.his.emergencyservice.order.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
+import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDto;
+import kr.co.seoulit.his.emergencyservice.order.dto.OrderVerbalConfirmRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +37,12 @@ public class OrderController {
         return ApiResponse.success(orderService.listOrders(encounterId));
     }
 
+    @Operation(summary = "검사항목 검색", description = "처방 등록 때 검사 항목(itemCode·itemName)을 고르는 용도. 처방코어 lab-items/search 호출(LAB팀 계약: itemCode, itemName, testClassification, specimenTypes). name 이 없으면 전체, 있으면 코드/이름 부분일치")
+    @GetMapping("/lab-items")
+    public ApiResponse<List<LabItemDto>> searchLabItems(@RequestParam(required = false) String name) {
+        return ApiResponse.success(orderService.searchLabItems(name));
+    }
+
     @Operation(summary = "처방 단건 조회", description = "처방코어 prescriptionId(= orderId) 기준")
     @GetMapping("/{orderId}")
     public ApiResponse<OrderDto> getOrder(@PathVariable String orderId) {
@@ -45,6 +53,13 @@ public class OrderController {
     @PatchMapping("/{orderId}/cancel")
     public ApiResponse<OrderDto> cancelOrder(@PathVariable String orderId, @RequestBody OrderCancelRequestDto request) {
         return ApiResponse.success(orderService.cancelOrder(orderId, request));
+    }
+
+    @Operation(summary = "구두처방 사후 확정", description = "구두처방(verbalYn=Y)을 의사가 사후에 확정한다(확정 일시·확정 의사 기록). 구두처방이 아니거나 이미 확정된 처방은 처방코어가 거절한다")
+    @PatchMapping("/{orderId}/verbal-confirm")
+    public ApiResponse<OrderDto> confirmVerbalOrder(@PathVariable String orderId,
+                                                    @RequestBody OrderVerbalConfirmRequestDto request) {
+        return ApiResponse.success(orderService.confirmVerbalOrder(orderId, request));
     }
 
     @Operation(summary = "검사 전송", description = "등록 뒤 처방코어가 검사(LAB)로 전송하도록 호출(자동 아님). 실패 시 502")

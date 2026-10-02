@@ -20,7 +20,12 @@ public class OrderDto {
     private String orderMethod;
     private String priorityCode;
     private String timingCode;
+    /** 처방방법 이름(예: Electronic / Verbal) */
+    private String orderMethodName;
+    /** 구두처방 여부 Y/N, 확정 일시·확정 의사(구두처방을 확정한 뒤에만) */
     private String verbalYn;
+    private String verbalConfirmedAt;
+    private String verbalConfirmedBy;
     private String prescribedBy;
     private String prescribedAt;
     private String cancelledAt;
@@ -31,7 +36,7 @@ public class OrderDto {
     private String labSendStatus;
     private String pharmacySendStatus;
 
-    /** 등록 때 dispatchNow=true 인 경우만: SENT / FAILED / NOT_APPLICABLE(해당 항목 없음). 요청하지 않았으면 null */
+    /** 등록 때 dispatchNow=true 인 경우만: 전송 직후 실제 상태 SENT / FAILED / PENDING / REQUESTED(상태를 못 읽음) / NOT_APPLICABLE(해당 항목 없음). 요청하지 않았으면 null */
     private String labDispatchStatus;
     private String pharmacyDispatchStatus;
 }

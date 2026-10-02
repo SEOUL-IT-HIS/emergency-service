@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.order.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,8 @@ import java.util.function.Supplier;
  *  - 등록   POST  /api/outpatient/prescriptions/emergency/{receptionId}
  *  - 조회   GET   /api/outpatient/prescriptions/{prescriptionId}
  *  - 목록   GET   /api/outpatient/prescriptions?receptionId=   (items 없는 가벼운 목록 + 전송 상태 요약)
+ *  - 검사항목 검색 GET /api/outpatient/prescriptions/lab-items/search?name=   (LAB팀 확정 계약, name 생략 시 전체)
+ *  - 구두확정 PATCH /api/outpatient/prescriptions/{prescriptionId}/verbal-confirm?confirmedBy=
  *  - 취소   PATCH /api/outpatient/prescriptions/{prescriptionId}/deactivate?cancelReason=&userId=
  *  - 전송   POST  /api/outpatient/prescriptions/{prescriptionId}/dispatch-lab | dispatch-pharmacy (자동 호출 아님)
  * 처방 수정 API 는 없다(취소 후 재등록). 전용 RestTemplate 을 쓴다 — 공용 RestTemplate(3초)보다 읽기 제한을 길게 둔다.
@@ -101,6 +104,35 @@ public class OrderCoreClient {
         return found == null ? List.of() : found;
     }
 
+    /** 검사항목 검색. name 이 비어 있으면 전체 목록(이름·코드 부분일치). */
+    public List<OrderCoreLabItem> searchLabItems(String name) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl + PRESCRIPTIONS + "/lab-items/search");
+        URI uri;
+        if (name != null && !name.isBlank()) {
+            uri = builder.queryParam("name", "{name}").encode().buildAndExpand(name.trim()).toUri();
+        } else {
+            uri = builder.encode().build().toUri();
+        }
+        List<OrderCoreLabItem> found = call("search lab items", name == null ? "" : name, () -> {
+            ResponseEntity<OrderCoreResponse<List<OrderCoreLabItem>>> response = restTemplate.exchange(
+                    uri, HttpMethod.GET, null,
+                    new ParameterizedTypeReference<OrderCoreResponse<List<OrderCoreLabItem>>>() {
+                    });
+            return response.getBody() == null ? null : response.getBody().getData();
+        });
+        return found == null ? List.of() : found;
+    }
+
+    /** 구두처방 사후 확정(확정 일시·확정자 기록). 구두처방이 아니거나 이미 확정된 처방이면 처방코어가 오류를 돌려준다. */
+    public void verbalConfirm(String prescriptionId, String confirmedBy) {
+        URI uri = UriComponentsBuilder.fromUriString(baseUrl + PRESCRIPTIONS + "/{id}/verbal-confirm")
+                .queryParam("confirmedBy", "{confirmedBy}")
+                .encode()
+                .buildAndExpand(prescriptionId, confirmedBy)
+                .toUri();
+        call("verbal confirm", prescriptionId, () -> restTemplate.exchange(uri, HttpMethod.PATCH, null, Void.class));
+    }
+
     public OrderCorePrescription get(String prescriptionId) {
         String url = baseUrl + PRESCRIPTIONS + "/" + prescriptionId;
         OrderCorePrescription found = call("get prescription", prescriptionId, () -> {
@@ -149,6 +181,9 @@ public class OrderCoreClient {
             log.warn("order core {} failed: target={}, status={}, message={}", what, target, e.getStatusCode(), message);
             if (status == HttpStatus.NOT_FOUND) {
                 throw ResourceNotFoundException.of("prescription", target);
+            }
+            if (status == HttpStatus.CONFLICT) {
+                throw new ConflictException("order core conflict (" + what + "): " + message);
             }
             if (e.getStatusCode().is4xxClientError()) {
                 throw new IllegalArgumentException("order core rejected the request (" + what + "): " + message);
