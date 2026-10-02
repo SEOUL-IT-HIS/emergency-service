@@ -109,6 +109,28 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 ---
 
+## 3-1. 응급 처방 연동 — 처방코어(OPD) 호출 (검사·약품만)
+
+처방 원장은 **처방코어(OPD, outpatient-service)** 가 소유한다. 응급은 서버 대 서버로 호출하는 **BFF 프록시**만 두고(`/api/emergency/orders*`), 처방 내용은 응급 DB에 저장하지 않는다(`orderId` 참조만). 위 3장의 `/api/orders*` 표는 초기 계획이고, 실제 처방코어 API는 아래다(2026-10-01 처방코어 회신 기준).
+
+| Method | Endpoint (응급) | 처방코어 호출 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/emergency/orders` | `POST /api/outpatient/prescriptions/emergency/{receptionId}` | 검사·약품 처방 등록. 본문 `encounterId`(접수ID), `prescribedBy`, `priorityCode`(ORDER_PRIORITY_CD, STAT=01), `timingCode`(ORDER_TIMING_CD 01/02/03), `items[]`, 선택 `verbalYn`(Y/N), `dispatchNow`. `patientId`·`serviceType="ER"`·`departmentCode="10"`·`orderMethod="01"`은 서버가 채움 |
+| GET | `/api/emergency/orders/{orderId}` | `GET /api/outpatient/prescriptions/{id}` | 처방 단건 |
+| PATCH | `/api/emergency/orders/{orderId}/cancel` | `PATCH …/{id}/deactivate?cancelReason=&userId=` | 취소(삭제 아님). **수정 API는 없음 — 변경은 취소 후 재등록** |
+| POST | `/api/emergency/orders/{orderId}/dispatch-lab` | `POST …/{id}/dispatch-lab` | 검사(LAB) 전송. 자동 호출이 아니라 응급이 직접 호출 |
+| POST | `/api/emergency/orders/{orderId}/dispatch-pharmacy` | `POST …/{id}/dispatch-pharmacy` | 약제(PHM) 전송 |
+
+- **영상(방사선) 오더는 제외**: 처방코어가 받지 않는다. `items[].prescriptionType`은 `"검사"`·`"약품"`만 허용(그 외 400).
+- `dispatchNow=true` 이면 등록 직후 검사 항목은 `dispatch-lab`, 약품 항목은 `dispatch-pharmacy`까지 호출한다. 등록은 이미 끝났으므로 전송이 실패해도 되돌리지 않고 응답의 `labDispatchStatus`/`pharmacyDispatchStatus`(`SENT`/`FAILED`/`NOT_APPLICABLE`)로 알리며, 전송 API로 다시 시도한다.
+- **구두처방**: 지금은 일반 처방(`orderMethod=01`)으로 등록만 된다. 처방코어의 `verbalYn`·확정(`PATCH …/verbal-confirm?confirmedBy=`)이 나오면 `app.order.forward-verbal-yn=true`로 켜고 확정 호출을 붙인다. `orderMethod`는 ORDER_METHOD_CD 확정 전까지 `01`.
+- 우선순위·시점 코드는 처방코어가 잘못된 값도 그대로 저장하므로 **응급이 호출 전에 검증**(admin 공통코드, 없으면 폴백)한다.
+- 오류: 처방코어 4xx → 400(메시지 포함), 404 → 404, 5xx·타임아웃·연결 실패 → **502** `EMG_UPSTREAM_ERROR`.
+- 설정: `app.order.base-url`(기본 `http://localhost:8088`, 환경변수 `ORDER_BASE_URL`), `app.order.department-code`(`10`), `app.order.forward-verbal-yn`(`false`).
+- 처방 목록(`GET …/prescriptions?receptionId=`)은 처방코어가 추가 예정 — 나오면 응급 목록 화면에 연결한다.
+
+---
+
 ## 4. 타 서비스 Consumer (응급이 자주 쓰는 API)
 
 | Provider | Method | URL | 용도 |

@@ -2,6 +2,7 @@ package kr.co.seoulit.his.emergencyservice.common.config;
 
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
+import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * 400: 요청 값 오류 / 파싱 실패
  * 404: 대상 리소스 없음
  * 409: 리소스 상태 충돌
+ * 502: 연계 서비스(처방코어 등) 호출 실패
  * 500: 처리되지 않은 서버 오류 (내부 메시지 노출 금지)
  */
 @RestControllerAdvice(basePackages = "kr.co.seoulit.his.emergencyservice")
@@ -56,6 +58,12 @@ public class EmergencyExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleConflict(ConflictException exception) {
         return ApiResponse.error("EMG_CONFLICT", exception.getMessage());
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiResponse<Void> handleExternalService(ExternalServiceException exception) {
+        return ApiResponse.error("EMG_UPSTREAM_ERROR", exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

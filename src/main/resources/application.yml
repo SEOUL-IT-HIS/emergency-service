@@ -31,6 +31,13 @@ app:
   patient:
     # patient-service 배치조회 base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.128:8087
     base-url: ${PATIENT_BASE_URL:http://localhost:8087}
+  order:
+    # 처방코어(OPD, outpatient-service) base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시 application-local.yml 에서 덮어쓴다
+    base-url: ${ORDER_BASE_URL:http://localhost:8088}
+    # 응급의학과 코드(ADM DEPT_CD)
+    department-code: "10"
+    # 처방코어가 verbalYn 을 지원하면 true (그때까지 구두처방도 일반 처방으로 등록한다)
+    forward-verbal-yn: false
   kafka:
     # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
     intake:

@@ -39,6 +39,9 @@ public final class EmgCodes {
     /** admin에 이미 있는 그룹(진료과 01~18, 병동 01~08) — 입원요청에서 씀. admin이 꺼져 있으면 검증 생략 */
     public static final String DEPT_GROUP = "DEPT_CD";
     public static final String WARD_GROUP = "WARD_CD";
+    /** 처방코어(OPD)가 쓰는 admin 그룹 — 응급은 호출 전에 값을 검증한다 */
+    public static final String ORDER_PRIORITY_GROUP = "ORDER_PRIORITY_CD";
+    public static final String ORDER_TIMING_GROUP = "ORDER_TIMING_CD";
 
     // ---- 구역 ----
     public static final String ZONE_RESUS = "01";
@@ -73,6 +76,12 @@ public final class EmgCodes {
     public static final String DISPOSITION_DAMA = "05";
     public static final List<String> DISPOSITION_TYPE_FALLBACK =
             List.of(DISPOSITION_HOME, DISPOSITION_ADMIT, DISPOSITION_TRANSFER, DISPOSITION_DEATH, DISPOSITION_DAMA);
+
+    // ---- 처방 우선순위(ORDER_PRIORITY_CD)·시점(ORDER_TIMING_CD) — admin 값이 없을 때만 폴백 ----
+    public static final String ORDER_PRIORITY_STAT = "01";
+    public static final List<String> ORDER_PRIORITY_FALLBACK = List.of(ORDER_PRIORITY_STAT);
+    /** 01 Scheduled / 02 As Needed(PRN) / 03 Once */
+    public static final List<String> ORDER_TIMING_FALLBACK = List.of("01", "02", "03");
 
     // ---- KTAS 등급 (admin TRIAGE_CD: 01~05) ----
     public static final List<String> KTAS_LEVEL_FALLBACK = List.of("01", "02", "03", "04", "05");
