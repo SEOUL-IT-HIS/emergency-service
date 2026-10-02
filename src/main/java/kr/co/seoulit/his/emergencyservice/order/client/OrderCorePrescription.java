@@ -29,4 +29,8 @@ public class OrderCorePrescription {
     private String timingCode;
     private String verbalYn;
     private List<OrderItemDto> items;
+    /** 목록 조회(receptionId)에서 내려오는 전송 상태 요약. 약제는 처방 단위(PENDING/SENT/FAILED) */
+    private String pharmacySendStatus;
+    /** 검사 항목 전송 상태 요약: 하나라도 FAILED면 FAILED, 미전송/PENDING이 있으면 PENDING, 전부 SENT면 SENT, 검사 항목이 없으면 null */
+    private String labSendStatus;
 }

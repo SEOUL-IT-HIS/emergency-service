@@ -11,6 +11,8 @@ import kr.co.seoulit.his.emergencyservice.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "ER-ORDER 처방 연동", description = "처방코어(OPD) 응급 처방 호출 — 검사·약품만(영상 오더 제외). 처방 원장은 처방코어(Provider=OPD), 응급은 BFF 로 호출만 한다")
 @RestController
 @RequestMapping("/api/emergency/orders")
@@ -24,6 +26,13 @@ public class OrderController {
     @PostMapping
     public ApiResponse<OrderDto> createOrder(@RequestBody OrderCreateRequestDto request) {
         return ApiResponse.success(orderService.createOrder(request));
+    }
+
+    @Operation(summary = "접수의 처방 목록 조회",
+            description = "encounterId=접수ID. 처방코어 GET /prescriptions?receptionId= 호출. 최근 처방 먼저, items 없는 가벼운 목록(검사/약제 전송 상태 요약 포함) — 상세는 단건 조회")
+    @GetMapping
+    public ApiResponse<List<OrderDto>> listOrders(@RequestParam String encounterId) {
+        return ApiResponse.success(orderService.listOrders(encounterId));
     }
 
     @Operation(summary = "처방 단건 조회", description = "처방코어 prescriptionId(= orderId) 기준")

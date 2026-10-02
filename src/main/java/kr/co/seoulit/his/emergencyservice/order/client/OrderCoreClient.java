@@ -20,12 +20,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
  * 처방코어(OPD, outpatient-service)를 서버 대 서버로 호출한다. 응급 처방은 전용 API 를 쓴다.
  *  - 등록   POST  /api/outpatient/prescriptions/emergency/{receptionId}
  *  - 조회   GET   /api/outpatient/prescriptions/{prescriptionId}
+ *  - 목록   GET   /api/outpatient/prescriptions?receptionId=   (items 없는 가벼운 목록 + 전송 상태 요약)
  *  - 취소   PATCH /api/outpatient/prescriptions/{prescriptionId}/deactivate?cancelReason=&userId=
  *  - 전송   POST  /api/outpatient/prescriptions/{prescriptionId}/dispatch-lab | dispatch-pharmacy (자동 호출 아님)
  * 처방 수정 API 는 없다(취소 후 재등록). 전용 RestTemplate 을 쓴다 — 공용 RestTemplate(3초)보다 읽기 제한을 길게 둔다.
@@ -77,6 +79,26 @@ public class OrderCoreClient {
             throw new ExternalServiceException("order core did not return a prescriptionId");
         }
         return created;
+    }
+
+    /**
+     * 접수(receptionId)에 만들어진 응급 처방 목록. 가벼운 목록이라 items 는 오지 않는다(처방코어 회신).
+     * 응답이 비어 있으면 빈 목록.
+     */
+    public List<OrderCorePrescription> listByReception(String receptionId) {
+        URI uri = UriComponentsBuilder.fromUriString(baseUrl + PRESCRIPTIONS)
+                .queryParam("receptionId", "{receptionId}")
+                .encode()
+                .buildAndExpand(receptionId)
+                .toUri();
+        List<OrderCorePrescription> found = call("list prescriptions", receptionId, () -> {
+            ResponseEntity<OrderCoreResponse<List<OrderCorePrescription>>> response = restTemplate.exchange(
+                    uri, HttpMethod.GET, null,
+                    new ParameterizedTypeReference<OrderCoreResponse<List<OrderCorePrescription>>>() {
+                    });
+            return response.getBody() == null ? null : response.getBody().getData();
+        });
+        return found == null ? List.of() : found;
     }
 
     public OrderCorePrescription get(String prescriptionId) {

@@ -27,6 +27,10 @@ public class OrderDto {
     private String cancelReason;
     private List<OrderItemDto> items;
 
+    /** 처방코어가 알려주는 전송 상태(목록·조회 응답): 검사는 항목 요약, 약제는 처방 단위. PENDING / SENT / FAILED, 검사 항목이 없으면 labSendStatus 는 null */
+    private String labSendStatus;
+    private String pharmacySendStatus;
+
     /** 등록 때 dispatchNow=true 인 경우만: SENT / FAILED / NOT_APPLICABLE(해당 항목 없음). 요청하지 않았으면 null */
     private String labDispatchStatus;
     private String pharmacyDispatchStatus;

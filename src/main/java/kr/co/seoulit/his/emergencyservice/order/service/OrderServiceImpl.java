@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -108,6 +109,24 @@ public class OrderServiceImpl implements OrderService {
         log.info("응급 처방 등록 - orderId={}, receptionId={}, 항목 {}건", created.getPrescriptionId(), receptionId,
                 request.getItems().size());
         return dto;
+    }
+
+    @Override
+    public List<OrderDto> listOrders(String encounterId) {
+        if (!StringUtils.hasText(encounterId)) {
+            throw new IllegalArgumentException("encounterId is required");
+        }
+        // 시각은 같은 형식의 ISO 문자열이라 문자열 비교가 시간 순서와 같다. 시각이 없는 건은 뒤로.
+        return orderCoreClient.listByReception(encounterId).stream()
+                .map(core -> {
+                    OrderDto dto = toDto(core);
+                    if (dto.getEncounterId() == null) {
+                        dto.setEncounterId(encounterId);
+                    }
+                    return dto;
+                })
+                .sorted(Comparator.comparing(OrderDto::getPrescribedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     @Override
@@ -232,6 +251,8 @@ public class OrderServiceImpl implements OrderService {
         dto.setCancelledAt(core.getCancelledAt());
         dto.setCancelReason(core.getCancelReason());
         dto.setItems(core.getItems());
+        dto.setLabSendStatus(core.getLabSendStatus());
+        dto.setPharmacySendStatus(core.getPharmacySendStatus());
         return dto;
     }
 

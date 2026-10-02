@@ -150,4 +150,33 @@ class OrderCoreClientTest {
 
         server.verify();
     }
+
+    @Test
+    void listByReceptionCallsTheReceptionFilterAndReadsTheSendStatusSummaries() {
+        server.expect(requestTo(BASE + "/api/outpatient/prescriptions?receptionId=" + RECEPTION_ID))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"message\":\"OK\",\"data\":["
+                        + "{\"prescriptionId\":\"" + ORDER_ID + "\",\"receptionId\":\"" + RECEPTION_ID + "\","
+                        + "\"status\":\"ORDERED\",\"priorityCode\":\"01\",\"labSendStatus\":\"PENDING\","
+                        + "\"pharmacySendStatus\":\"SENT\",\"somethingNew\":true},"
+                        + "{\"prescriptionId\":\"p2\",\"labSendStatus\":null}]}", MediaType.APPLICATION_JSON));
+
+        List<OrderCorePrescription> list = client.listByReception(RECEPTION_ID);
+
+        assertThat(list).hasSize(2);
+        assertThat(list.get(0).getPrescriptionId()).isEqualTo(ORDER_ID);
+        assertThat(list.get(0).getLabSendStatus()).isEqualTo("PENDING");
+        assertThat(list.get(0).getPharmacySendStatus()).isEqualTo("SENT");
+        assertThat(list.get(0).getPriorityCode()).isEqualTo("01");
+        assertThat(list.get(1).getLabSendStatus()).isNull();      // 검사 항목이 없으면 null
+        server.verify();
+    }
+
+    @Test
+    void anEmptyOrMissingListIsAnEmptyList() {
+        server.expect(requestTo(BASE + "/api/outpatient/prescriptions?receptionId=" + RECEPTION_ID))
+                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":null}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.listByReception(RECEPTION_ID)).isEmpty();
+    }
 }

@@ -259,4 +259,38 @@ class OrderServiceImplTest {
         assertThat(dto.getOrderId()).isEqualTo(ORDER_ID);
         assertThat(dto.getCancelReason()).isEqualTo("중복");
     }
+
+    @Test
+    void listReturnsTheReceptionsOrdersNewestFirstWithTheSendStatuses() {
+        OrderCorePrescription older = new OrderCorePrescription();
+        older.setPrescriptionId("o-old");
+        older.setStatus("ORDERED");
+        older.setPrescribedAt("2026-10-02T09:00:00");
+        older.setLabSendStatus("SENT");
+        OrderCorePrescription newer = new OrderCorePrescription();
+        newer.setPrescriptionId("o-new");
+        newer.setReceptionId(RECEPTION_ID);
+        newer.setStatus("ORDERED");
+        newer.setPrescribedAt("2026-10-02T10:30:00");
+        newer.setLabSendStatus("FAILED");
+        newer.setPharmacySendStatus("PENDING");
+        OrderCorePrescription undated = new OrderCorePrescription();
+        undated.setPrescriptionId("o-undated");
+        when(client.listByReception(RECEPTION_ID)).thenReturn(List.of(older, undated, newer));
+
+        List<OrderDto> orders = service.listOrders(RECEPTION_ID);
+
+        assertThat(orders).extracting(OrderDto::getOrderId).containsExactly("o-new", "o-old", "o-undated");
+        assertThat(orders.get(0).getLabSendStatus()).isEqualTo("FAILED");
+        assertThat(orders.get(0).getPharmacySendStatus()).isEqualTo("PENDING");
+        assertThat(orders.get(1).getEncounterId()).isEqualTo(RECEPTION_ID);   // 목록에 receptionId 가 없으면 요청 값으로 채움
+        assertThat(orders.get(0).getItems()).isNull();                         // 가벼운 목록 — 상세는 단건 조회
+    }
+
+    @Test
+    void listNeedsAnEncounterId() {
+        assertThatThrownBy(() -> service.listOrders(" ")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("encounterId");
+        verifyNoInteractions(client);
+    }
 }
