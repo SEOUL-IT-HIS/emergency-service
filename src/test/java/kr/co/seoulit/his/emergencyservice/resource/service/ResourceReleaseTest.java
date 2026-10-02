@@ -2,6 +2,7 @@ package kr.co.seoulit.his.emergencyservice.resource.service;
 
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.resource.dto.BedAssignmentDto;
 import kr.co.seoulit.his.emergencyservice.resource.entity.Bed;
 import kr.co.seoulit.his.emergencyservice.resource.entity.BedAssignment;
@@ -27,7 +28,8 @@ class ResourceReleaseTest {
     @BeforeEach
     void setUp() {
         bedAssignmentRepository = mock(BedAssignmentRepository.class);
-        service = new ResourceServiceImpl(mock(BedRepository.class), bedAssignmentRepository, new CommonCodeCache());
+        service = new ResourceServiceImpl(mock(BedRepository.class), bedAssignmentRepository, new CommonCodeCache(),
+                mock(DischargeProgress.class));
     }
 
     private BedAssignment assignment(String id, String receptionId, String bedNo) {

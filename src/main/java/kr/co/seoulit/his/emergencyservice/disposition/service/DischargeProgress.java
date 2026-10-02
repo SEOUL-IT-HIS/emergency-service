@@ -1,5 +1,6 @@
 package kr.co.seoulit.his.emergencyservice.disposition.service;
 
+import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.util.InChunks;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.AdmissionRequest;
@@ -86,6 +87,17 @@ public class DischargeProgress {
 
     public Stage stage(String receptionId) {
         return stages(List.of(receptionId)).get(receptionId);
+    }
+
+    /**
+     * 퇴실 처리가 끝난(DONE) 접수에 새로 배치·평가·처방하려는 요청을 막는다 → ConflictException(409).
+     * 병상 배정, KTAS·활력징후·격리·위험 스크리닝 등록, 처방 등록에 쓴다. 진료기록·처치·투약·CPR·동의 같은 사후 기록과
+     * 해제·취소 같은 정리 작업은 퇴실 뒤에도 필요하므로 이 검사를 걸지 않는다. 병동 대기(WAITING_WARD) 중은 아직 응급실에 있으니 허용한다.
+     */
+    public void requireNotDischarged(String receptionId) {
+        if (receptionId != null && !receptionId.isBlank() && stage(receptionId) == Stage.DONE) {
+            throw new ConflictException("reception already discharged: " + receptionId);
+        }
     }
 
     public Set<String> doneReceptionIds(Collection<String> receptionIds) {

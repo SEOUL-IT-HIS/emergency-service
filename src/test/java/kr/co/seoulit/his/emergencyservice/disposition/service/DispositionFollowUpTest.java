@@ -328,4 +328,18 @@ class DispositionFollowUpTest {
         service.updateAdmissionStatus("d-old", null, EmgCodes.ADMISSION_BED_ASSIGNED, "03");
         org.mockito.Mockito.verify(resourceService).releaseBedsOf("r-1", ResourceService.SYSTEM_ACTOR);
     }
+
+    @Test
+    void dispositionsReportTheDischargeStageSoTheScreenCanLockDischargedPatients() {
+        decisionsBehaveLikeAStore();
+        DispositionDto home = service.createDisposition(decide(EmgCodes.DISPOSITION_HOME));
+        assertThat(home.getStage()).isEqualTo("DONE");           // 귀가는 즉시 퇴실 완료
+
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_REQUESTED));
+        assertThat(service.getDispositions("r-1").get(0).getStage()).isEqualTo("WAITING_WARD");
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_BED_ASSIGNED));
+        assertThat(service.getDispositions("r-1").get(0).getStage()).isEqualTo("DONE");
+        decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_REJECTED));
+        assertThat(service.getDispositions("r-1").get(0).getStage()).isEqualTo("OPEN");
+    }
 }

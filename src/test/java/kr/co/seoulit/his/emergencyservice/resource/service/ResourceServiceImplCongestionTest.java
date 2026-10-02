@@ -2,6 +2,7 @@ package kr.co.seoulit.his.emergencyservice.resource.service;
 
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.resource.dto.CongestionDto;
 import kr.co.seoulit.his.emergencyservice.resource.dto.CongestionMetricDto;
 import kr.co.seoulit.his.emergencyservice.resource.repository.*;
@@ -25,7 +26,8 @@ class ResourceServiceImplCongestionTest {
         service = new ResourceServiceImpl(
                 bedRepository,
                 mock(BedAssignmentRepository.class),
-                new CommonCodeCache());
+                new CommonCodeCache(),
+                mock(DischargeProgress.class));
     }
 
     private static BedStatusCount row(String zone, String status, long count) {

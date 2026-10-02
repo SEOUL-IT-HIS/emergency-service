@@ -109,6 +109,23 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 ---
 
+## 2-1. 퇴실 완료(DONE) 환자의 입력 제한
+
+퇴실 처리가 끝난(`DischargeProgress` DONE — 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동 병상 배정 회신, 전원은 소견서 작성) 접수에는 새로 배치·평가·처방하지 못한다. 막힌 요청은 **409** `EMG_CONFLICT`(`reception already discharged: <접수ID>`)로 응답한다. 병동 회신을 기다리는 중(WAITING_WARD)이나 후속 조치 전(OPEN)은 아직 응급실에 있으므로 막지 않는다.
+
+| 구분 | 퇴실 완료 후 | API |
+| --- | --- | --- |
+| 막음(409) | 병상 배정 | `POST /resources/bed-assignments` |
+| 막음(409) | KTAS 분류·재평가, 활력징후, 격리 등록, 위험 스크리닝 | `POST/PUT /triage/ktas`, `POST /triage/vital-assessments`, `POST /triage/infection-isolations`, `POST /triage/risk-screenings` |
+| 막음(409) | 처방 등록 | `POST /orders` (처방코어 호출 없음) |
+| 허용 | 사후 기록 | 진료기록·처치·투약(MAR)·CPR·동의 |
+| 허용 | 정리 작업 | 병상 해제, 격리 해제, 처방 취소·전송·구두 확정 |
+
+- 화면이 미리 막도록 `GET /dispositions`·`POST /dispositions` 응답의 최신 결정에 `stage`(NONE/OPEN/WAITING_WARD/DONE)를 내려준다. 화면은 DONE이면 위 패널의 등록 버튼을 비활성화하고 안내를 보여 준다.
+- 이유: 퇴실한 환자에게 병상을 배정하면 퇴실 이벤트가 다시 오지 않아 병상이 영구 점유로 남는다.
+
+---
+
 ## 3-1. 응급 처방 연동 — 처방코어(OPD) 호출 (검사·약품만)
 
 처방 원장은 **처방코어(OPD, outpatient-service)** 가 소유한다. 응급은 서버 대 서버로 호출하는 **BFF 프록시**만 두고(`/api/emergency/orders*`), 처방 내용은 응급 DB에 저장하지 않는다(`orderId` 참조만). 위 3장의 `/api/orders*` 표는 초기 계획이고, 실제 처방코어 API는 아래다(2026-10-01 처방코어 회신 기준).

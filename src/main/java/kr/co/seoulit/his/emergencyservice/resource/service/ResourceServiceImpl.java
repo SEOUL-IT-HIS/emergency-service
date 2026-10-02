@@ -3,6 +3,7 @@ package kr.co.seoulit.his.emergencyservice.resource.service;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.resource.dto.*;
@@ -36,6 +37,7 @@ public class ResourceServiceImpl implements ResourceService {
     private final BedRepository bedRepository;
     private final BedAssignmentRepository bedAssignmentRepository;
     private final CommonCodeCache commonCodeCache;
+    private final DischargeProgress dischargeProgress;
 
     /**
      * 혼잡도 집계 규칙 (UD2-84)
@@ -162,6 +164,8 @@ public class ResourceServiceImpl implements ResourceService {
         if (!StringUtils.hasText(request.getEncounterId()) || request.getBedId() == null) {
             throw new IllegalArgumentException("encounterId and bedId are required");
         }
+        // 퇴실이 끝난 환자에게 배정하면 퇴실 이벤트가 다시 오지 않아 병상이 영구 점유로 남는다
+        dischargeProgress.requireNotDischarged(request.getEncounterId());
         Bed bed = bedRepository.findById(request.getBedId())
                 .orElseThrow(() -> ResourceNotFoundException.of("bed", request.getBedId()));
         if (STATUS_OCCUPIED.equals(bed.getBedStatusCode())) {

@@ -6,6 +6,7 @@ import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceExcept
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreLabItem;
@@ -44,12 +45,14 @@ class OrderServiceImplTest {
 
     private OrderCoreClient client;
     private ReceptionIntakeRepository receptionIntakeRepository;
+    private DischargeProgress dischargeProgress;
     private OrderServiceImpl service;
 
     @BeforeEach
     void setUp() {
         client = mock(OrderCoreClient.class);
         receptionIntakeRepository = mock(ReceptionIntakeRepository.class);
+        dischargeProgress = mock(DischargeProgress.class);
         ReceptionIntake intake = new ReceptionIntake();
         intake.setId(RECEPTION_ID);
         intake.setPatientId("patient-1");
@@ -76,7 +79,7 @@ class OrderServiceImplTest {
 
     private OrderServiceImpl newService(boolean forwardVerbalYn) {
         CommonCodeCache cache = new CommonCodeCache();
-        return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), "10", forwardVerbalYn);
+        return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress, "10", forwardVerbalYn);
     }
 
     private OrderItemDto lab() {

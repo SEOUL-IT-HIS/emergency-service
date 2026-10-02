@@ -69,7 +69,8 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         DispositionDto dto = toDispositionDto(dispositionRepository.save(entity));
-        releaseBedsIfDischarged(entity.getReceptionId());
+        DischargeProgress.Stage stageAfter = releaseBedsIfDischarged(entity.getReceptionId());
+        dto.setStage(stageAfter == null ? null : stageAfter.name());
         // 새 결정은 후속 조치가 없으니 입원·전원이면 아직 바꿀 수 있다(귀가·사망·자의퇴원은 즉시 완료)
         dto.setChangeable(EmgCodes.DISPOSITION_ADMIT.equals(entity.getDispositionTypeCode())
                 || EmgCodes.DISPOSITION_TRANSFER.equals(entity.getDispositionTypeCode()));
@@ -164,7 +165,9 @@ public class DispositionServiceImpl implements DispositionService {
                 .collect(Collectors.toList());
         // 바꿀 수 있는 건 최신 결정뿐(이전 결정은 이력)
         if (!result.isEmpty()) {
-            result.get(0).setChangeable(dischargeProgress.stage(receptionId) == DischargeProgress.Stage.OPEN);
+            DischargeProgress.Stage stage = dischargeProgress.stage(receptionId);
+            result.get(0).setChangeable(stage == DischargeProgress.Stage.OPEN);
+            result.get(0).setStage(stage.name());
         }
         return result;
     }
@@ -243,13 +246,15 @@ public class DispositionServiceImpl implements DispositionService {
      * 퇴실 처리가 끝나면(DischargeProgress 기준 DONE) 응급실 병상을 자동으로 비운다(해제자 SYSTEM, 병상은 EMPTY).
      * 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동 병상 배정 회신, 전원은 소견서 작성 시점이다.
      */
-    private void releaseBedsIfDischarged(String receptionId) {
+    private DischargeProgress.Stage releaseBedsIfDischarged(String receptionId) {
         if (!StringUtils.hasText(receptionId)) {
-            return;
+            return null;
         }
-        if (dischargeProgress.stage(receptionId) == DischargeProgress.Stage.DONE) {
+        DischargeProgress.Stage stage = dischargeProgress.stage(receptionId);
+        if (stage == DischargeProgress.Stage.DONE) {
             resourceService.releaseBedsOf(receptionId, ResourceService.SYSTEM_ACTOR);
         }
+        return stage;
     }
 
     @Override

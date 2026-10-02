@@ -5,6 +5,7 @@ import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeReposit
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
@@ -57,16 +58,18 @@ public class OrderServiceImpl implements OrderService {
     private final OrderCoreClient orderCoreClient;
     private final ReceptionIntakeRepository receptionIntakeRepository;
     private final CommonCodeResolver codeResolver;
+    private final DischargeProgress dischargeProgress;
     private final String departmentCode;
     private final boolean forwardVerbalYn;
 
     public OrderServiceImpl(OrderCoreClient orderCoreClient, ReceptionIntakeRepository receptionIntakeRepository,
-                            CommonCodeResolver codeResolver,
+                            CommonCodeResolver codeResolver, DischargeProgress dischargeProgress,
                             @Value("${app.order.department-code:10}") String departmentCode,
                             @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn) {
         this.orderCoreClient = orderCoreClient;
         this.receptionIntakeRepository = receptionIntakeRepository;
         this.codeResolver = codeResolver;
+        this.dischargeProgress = dischargeProgress;
         this.departmentCode = departmentCode;
         this.forwardVerbalYn = forwardVerbalYn;
     }
@@ -80,6 +83,8 @@ public class OrderServiceImpl implements OrderService {
         if (!StringUtils.hasText(reception.getPatientId())) {
             throw new IllegalArgumentException("reception has no patientId: " + receptionId);
         }
+        // 퇴실이 끝난 환자에게는 새 처방을 내지 않는다(기존 처방의 취소·전송·구두 확정은 정리 작업이라 허용)
+        dischargeProgress.requireNotDischarged(receptionId);
 
         boolean verbal = "Y".equals(request.getVerbalYn());
         OrderCoreCreateRequest body = new OrderCoreCreateRequest();

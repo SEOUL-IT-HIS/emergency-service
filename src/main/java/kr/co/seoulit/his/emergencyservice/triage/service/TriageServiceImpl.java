@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.triage.dto.*;
 import kr.co.seoulit.his.emergencyservice.triage.entity.*;
 import kr.co.seoulit.his.emergencyservice.triage.mapper.TriageMapstructMapper;
@@ -35,6 +36,7 @@ public class TriageServiceImpl implements TriageService {
 
     private final TriageMapstructMapper triageMapper;
     private final CommonCodeResolver codeResolver;
+    private final DischargeProgress dischargeProgress;
 
     @Override
     @Transactional(readOnly = true)
@@ -62,6 +64,7 @@ public class TriageServiceImpl implements TriageService {
                 || !StringUtils.hasText(request.getAssessedById())) {
             throw new IllegalArgumentException("encounterId, ktasScore, assessedById are required");
         }
+        dischargeProgress.requireNotDischarged(request.getEncounterId());
         codeResolver.require("ktasScore", request.getKtasScore(),
                 codeResolver.valueSet(EmgCodes.KTAS_LEVEL_GROUP, EmgCodes.KTAS_LEVEL_FALLBACK));
         String assessmentTypeCode = StringUtils.hasText(request.getAssessmentTypeCode())
@@ -98,6 +101,7 @@ public class TriageServiceImpl implements TriageService {
     public TriageAssessmentDto updateKtas(String id, KtasUpdateRequestDto request) {
         TriageAssessment previous = triageAssessmentRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("ktas", id));
+        dischargeProgress.requireNotDischarged(previous.getReceptionId());
 
         String nextScore = StringUtils.hasText(request.getKtasScore())
                 ? request.getKtasScore() : previous.getKtasLevelCode();
@@ -132,6 +136,7 @@ public class TriageServiceImpl implements TriageService {
                 || !StringUtils.hasText(request.getMeasuredById())) {
             throw new IllegalArgumentException("encounterId, vitals[], measuredById are required");
         }
+        dischargeProgress.requireNotDischarged(request.getEncounterId());
         List<EwsRecord> saved = new ArrayList<>();
         for (VitalAssessmentCreateRequestDto.VitalItemDto vital : request.getVitals()) {
             validateVitalItem(vital);
@@ -210,6 +215,7 @@ public class TriageServiceImpl implements TriageService {
         }
         String receptionId = StringUtils.hasText(request.getEncounterId())
                 ? request.getEncounterId() : request.getPatientId();
+        dischargeProgress.requireNotDischarged(receptionId);
 
         boolean hasActiveIsolation = isolationAssessmentRepository.findByReceptionId(receptionId).stream()
                 .anyMatch(existing -> existing.getReleasedAt() == null
@@ -261,6 +267,7 @@ public class TriageServiceImpl implements TriageService {
                 || !StringUtils.hasText(request.getScreenedById())) {
             throw new IllegalArgumentException("encounterId, screenType, screenedById are required");
         }
+        dischargeProgress.requireNotDischarged(request.getEncounterId());
         codeResolver.require("screenType", request.getScreenType(),
                 codeResolver.valueSet(EmgCodes.SCREENING_TYPE_GROUP, EmgCodes.SCREENING_TYPE_FALLBACK));
         if (StringUtils.hasText(request.getResultCode())) {
