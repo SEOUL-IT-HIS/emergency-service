@@ -25,4 +25,32 @@ public class OrderItemDto {
     private String itemId;
     private String sendStatus;
     private String labOrderId;
+    /** LAB 이 검사 전송을 거절한 사유(예: 유효하지 않은 환자ID, 이미 접수된 오더). 전송이 실패(FAILED)했을 때만 있다 */
+    private String rejectReason;
+
+    /**
+     * 검사 결과(처방코어가 LAB 결과를 받아 둔 값을 그대로 전달한다 — 응급 DB에 저장하지 않고 열 때마다 처방코어에서 읽는다).
+     * 결과가 아직 없으면 resultReportedAt·resultDetails 가 비어 있다.
+     */
+    private String resultReportedAt;
+    private String resultValue;
+    private String resultUnit;
+    private String referenceRange;
+    private String abnormalFlag;
+    private java.util.List<ResultDetail> resultDetails;
+
+    /** 결과 한 줄(예: Blood Glucose Test 4 mg/dL, 기준 70-99, 플래그 L) */
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ResultDetail {
+        private Integer seq;
+        private String detailCode;
+        private String detailName;
+        private String resultValue;
+        private String resultUnit;
+        private String referenceRange;
+        /** L(낮음) / H(높음) / N(정상) 등 LAB 이 준 값 */
+        private String abnormalFlag;
+    }
 }

@@ -2,6 +2,7 @@ package kr.co.seoulit.his.emergencyservice.order.service;
 
 import kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake;
 import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
+import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
@@ -21,6 +22,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -61,17 +64,25 @@ public class OrderServiceImpl implements OrderService {
     private final DischargeProgress dischargeProgress;
     private final String departmentCode;
     private final boolean forwardVerbalYn;
+    private final Duration labItemCacheTtl;
+    /** 마지막으로 처방코어에서 받은 검사항목 전체 목록 — 처방코어↔LAB 연결이 잠깐 끊겨도 화면이 버티게 한다 */
+    private volatile CachedLabItems labItemCache;
+
+    private record CachedLabItems(List<LabItemDto> items, Instant loadedAt) {
+    }
 
     public OrderServiceImpl(OrderCoreClient orderCoreClient, ReceptionIntakeRepository receptionIntakeRepository,
                             CommonCodeResolver codeResolver, DischargeProgress dischargeProgress,
                             @Value("${app.order.department-code:10}") String departmentCode,
-                            @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn) {
+                            @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn,
+                            @Value("${app.order.lab-item-cache-minutes:10}") long labItemCacheMinutes) {
         this.orderCoreClient = orderCoreClient;
         this.receptionIntakeRepository = receptionIntakeRepository;
         this.codeResolver = codeResolver;
         this.dischargeProgress = dischargeProgress;
         this.departmentCode = departmentCode;
         this.forwardVerbalYn = forwardVerbalYn;
+        this.labItemCacheTtl = Duration.ofMinutes(Math.max(labItemCacheMinutes, 0));
     }
 
     @Override
@@ -138,16 +149,47 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
+    /**
+     * 검사항목은 목록이 작고 거의 바뀌지 않아 전체 목록을 받아 두고(기본 10분) 이름·코드는 응급에서 걸러서 돌려준다.
+     * 처방코어가 LAB 연결 불안정으로 검색에 실패해도(502), 받아 둔 목록이 있으면 오래됐어도 그걸로 응답한다 — 없을 때만 오류.
+     */
     @Override
     public List<LabItemDto> searchLabItems(String name) {
-        return orderCoreClient.searchLabItems(name).stream().map(core -> {
-            LabItemDto dto = new LabItemDto();
-            dto.setItemCode(core.getItemCode());
-            dto.setItemName(core.getItemName());
-            dto.setTestClassification(core.getTestClassification());
-            dto.setSpecimenTypes(core.getSpecimenTypes());
-            return dto;
-        }).toList();
+        CachedLabItems cached = labItemCache;
+        if (cached != null && !labItemCacheTtl.isZero()
+                && Duration.between(cached.loadedAt(), Instant.now()).compareTo(labItemCacheTtl) < 0) {
+            return filterLabItems(cached.items(), name);
+        }
+        try {
+            List<LabItemDto> all = orderCoreClient.searchLabItems(null).stream().map(core -> {
+                LabItemDto dto = new LabItemDto();
+                dto.setItemCode(core.getItemCode());
+                dto.setItemName(core.getItemName());
+                dto.setTestClassification(core.getTestClassification());
+                dto.setSpecimenTypes(core.getSpecimenTypes());
+                return dto;
+            }).toList();
+            labItemCache = new CachedLabItems(all, Instant.now());
+            return filterLabItems(all, name);
+        } catch (ExternalServiceException e) {
+            if (cached == null) {
+                throw e;
+            }
+            log.warn("검사항목 검색이 실패해 마지막으로 받아 둔 목록으로 응답한다 - {}", e.getMessage());
+            return filterLabItems(cached.items(), name);
+        }
+    }
+
+    /** 이름·코드에 입력한 글자가 들어 있는 항목(대소문자 구분 없음). 입력이 없으면 전체 */
+    private List<LabItemDto> filterLabItems(List<LabItemDto> items, String name) {
+        if (!StringUtils.hasText(name)) {
+            return items;
+        }
+        String needle = name.trim().toLowerCase();
+        return items.stream()
+                .filter(item -> (item.getItemName() != null && item.getItemName().toLowerCase().contains(needle))
+                        || (item.getItemCode() != null && item.getItemCode().toLowerCase().contains(needle)))
+                .toList();
     }
 
     @Override
@@ -325,17 +367,28 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    /** 검사 항목 전송 상태 요약: 하나라도 FAILED면 FAILED, 전부 SENT가 아니면 PENDING, 전부 SENT면 SENT, 검사 항목이 없으면 null */
+    /**
+     * 검사 항목 전송 상태 요약: 하나라도 실제로 실패했으면 FAILED, 전부 LAB 이 받았으면 SENT, 그 밖에는 PENDING, 검사 항목이 없으면 null.
+     * LAB 이 이미 받은 항목은 sendStatus 가 FAILED 로 남아 있어도 SENT 로 본다 — 같은 처방을 다시 전송하면 LAB 이
+     * "이미 접수된 오더입니다"로 거절하면서 처방코어가 항목을 FAILED 로 덮어쓰기 때문이다(실서버에서 확인).
+     */
     static String labSendStatusOf(OrderCorePrescription prescription) {
         List<OrderItemDto> labItems = prescription.getItems() == null ? List.of()
                 : prescription.getItems().stream().filter(item -> TYPE_LAB.equals(item.getPrescriptionType())).toList();
         if (labItems.isEmpty()) {
             return null;
         }
-        if (labItems.stream().anyMatch(item -> DISPATCH_FAILED.equals(item.getSendStatus()))) {
+        if (labItems.stream().anyMatch(item -> DISPATCH_FAILED.equals(item.getSendStatus()) && !receivedByLab(item))) {
             return DISPATCH_FAILED;
         }
-        return labItems.stream().allMatch(item -> DISPATCH_SENT.equals(item.getSendStatus())) ? DISPATCH_SENT : DISPATCH_PENDING;
+        return labItems.stream().allMatch(item -> DISPATCH_SENT.equals(item.getSendStatus()) || receivedByLab(item))
+                ? DISPATCH_SENT : DISPATCH_PENDING;
+    }
+
+    /** LAB 이 이 항목을 이미 받았는지: LAB 오더번호가 있거나, 거절 사유가 "이미 접수된 오더"(중복 전송)이다 */
+    static boolean receivedByLab(OrderItemDto item) {
+        return StringUtils.hasText(item.getLabOrderId())
+                || (item.getRejectReason() != null && item.getRejectReason().contains("이미 접수"));
     }
 
     private void requireOrderId(String orderId) {

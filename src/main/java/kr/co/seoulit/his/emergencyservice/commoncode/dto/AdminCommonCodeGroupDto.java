@@ -6,7 +6,7 @@ import lombok.Setter;
 
 /**
  * admin-service 공통코드 "그룹" 응답 항목.
- * GET /api/commonCodeGroup/list 응답 — hisfrontend 의
+ * GET /api/admin/commonCodeGroup/list 응답 — hisfrontend 의
  * features/commonCode/types/commonCodeGroupTypes.ts (CommonCodeGroup) 과 필드 맞춤.
  */
 @Getter

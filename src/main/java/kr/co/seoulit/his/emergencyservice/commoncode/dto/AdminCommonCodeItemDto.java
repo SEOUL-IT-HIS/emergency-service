@@ -6,7 +6,7 @@ import lombok.Setter;
 
 /**
  * admin-service 공통코드 "항목" 응답 항목.
- * GET /api/commonCodeItem/list?groupId= 응답 — hisfrontend 의
+ * GET /api/admin/commonCodeItem/list?groupId= 응답 — hisfrontend 의
  * features/commonCode/types/commonCodeItemTypes.ts (CommonCodeItem) 과 필드 맞춤.
  */
 @Getter

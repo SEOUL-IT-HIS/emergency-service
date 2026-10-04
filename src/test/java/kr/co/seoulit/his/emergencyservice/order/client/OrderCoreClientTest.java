@@ -221,4 +221,25 @@ class OrderCoreClientTest {
                 .isInstanceOf(kr.co.seoulit.his.emergencyservice.common.exception.ConflictException.class)
                 .hasMessageContaining("already confirmed");
     }
+
+    @Test
+    void labResultsOfAnItemAreReadThrough() {
+        server.expect(requestTo(BASE + "/api/outpatient/prescriptions/" + ORDER_ID))
+                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":{\"prescriptionId\":\"" + ORDER_ID + "\",\"items\":[{"
+                        + "\"prescriptionType\":\"검사\",\"itemCode\":\"01\",\"itemName\":\"Blood Glucose Test\",\"sendStatus\":\"SENT\","
+                        + "\"labOrderId\":\"130227e8\",\"resultReportedAt\":\"2026-10-02T15:55:12.308656\","
+                        + "\"resultDetails\":[{\"seq\":null,\"detailCode\":null,\"detailName\":null,\"resultValue\":\"4\","
+                        + "\"resultUnit\":\"mg/dL\",\"referenceRange\":\"70-99\",\"abnormalFlag\":\"L\"}]}]}}",
+                        MediaType.APPLICATION_JSON));
+
+        OrderCorePrescription found = client.get(ORDER_ID);
+
+        kr.co.seoulit.his.emergencyservice.order.dto.OrderItemDto item = found.getItems().get(0);
+        assertThat(item.getResultReportedAt()).isEqualTo("2026-10-02T15:55:12.308656");
+        assertThat(item.getResultDetails()).hasSize(1);
+        assertThat(item.getResultDetails().get(0).getResultValue()).isEqualTo("4");
+        assertThat(item.getResultDetails().get(0).getResultUnit()).isEqualTo("mg/dL");
+        assertThat(item.getResultDetails().get(0).getReferenceRange()).isEqualTo("70-99");
+        assertThat(item.getResultDetails().get(0).getAbnormalFlag()).isEqualTo("L");
+    }
 }

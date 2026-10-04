@@ -144,11 +144,15 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 - **영상(방사선) 오더는 제외**: 처방코어가 받지 않는다. `items[].prescriptionType`은 `"검사"`·`"약품"`만 허용(그 외 400).
 - `dispatchNow=true` 이면 등록 직후 검사 항목은 `dispatch-lab`, 약품 항목은 `dispatch-pharmacy`까지 호출한다. 등록은 이미 끝났으므로 전송이 실패해도 되돌리지 않고 응답의 `labDispatchStatus`/`pharmacyDispatchStatus`로 알리며, 전송 API로 다시 시도한다. 값은 `SENT`/`FAILED`/`PENDING`/`REQUESTED`(상태를 못 읽음)/`NOT_APPLICABLE`(해당 항목 없음).
 - **전송 호출 성공(HTTP 200)과 실제 전송 성공은 다르다.** 실서버(처방코어 개발 서버)에서 `dispatch-lab`이 200을 주고도 검사 항목이 `FAILED`(labOrderId 없음)로 남는 것을 확인했다. 그래서 응급은 전송 호출 직후 처방을 다시 읽어 **실제 전송 상태**를 돌려주고(`dispatch-lab`/`dispatch-pharmacy` 응답의 `status`), 처방코어가 비동기로 상태를 바꾸는 경우를 위해 화면은 전송·등록 뒤 목록을 다시 불러온다.
-- **구두처방**(2026-10-02 처방코어 안내 반영): `verbalYn=Y`로 등록하면 `orderMethod=02`(구두)로, 아니면 `01`(전자)로 보내고(ADM `ORDER_METHOD_CD`: 01 Electronic / 02 Verbal / 03 Telephone), `verbalYn`(Y/N)도 같이 전달한다(`app.order.forward-verbal-yn`, 기본 true — 문제가 생기면 false로 끌 수 있다). 사후 확정은 위 `verbal-confirm`. 응답에 `orderMethodName`(예: Verbal)과 확정 일시·확정자(`verbalConfirmedAt`/`verbalConfirmedBy`)가 온다. **처방코어 배포 전이라 실서버 연동은 미확인**.
+- **구두처방**(2026-10-02 처방코어 안내 반영): `verbalYn=Y`로 등록하면 `orderMethod=02`(구두)로, 아니면 `01`(전자)로 보내고(ADM `ORDER_METHOD_CD`: 01 Electronic / 02 Verbal / 03 Telephone), `verbalYn`(Y/N)도 같이 전달한다(`app.order.forward-verbal-yn`, 기본 true — 문제가 생기면 false로 끌 수 있다). 사후 확정은 위 `verbal-confirm`. 응답에 `orderMethodName`(예: Verbal)과 확정 일시·확정자(`verbalConfirmedAt`/`verbalConfirmedBy`)가 온다. 처방코어 개발 서버(2026-10-02~03)에서 등록·목록·단건·구두 확정·취소·검사 전송까지 확인했다.
 - 우선순위·시점 코드는 처방코어가 잘못된 값도 그대로 저장하므로 **응급이 호출 전에 검증**(admin 공통코드, 없으면 폴백)한다.
 - 오류: 처방코어 4xx → 400(메시지 포함), 404 → 404, 5xx·타임아웃·연결 실패 → **502** `EMG_UPSTREAM_ERROR`.
 - 설정: `app.order.base-url`(기본 `http://localhost:8088`, 환경변수 `ORDER_BASE_URL`), `app.order.department-code`(`10`), `app.order.forward-verbal-yn`(`false`).
-- 처방 목록은 처방코어의 `GET …/prescriptions?receptionId=`(응답 필드 확정, **처방코어 배포 전** — 배포 후 실서버 확인 필요)를 호출한다. 응급 화면은 환자를 고르면 이 목록을 불러오고, 투약(MAR)·처치 기록의 `orderId`는 이 목록에서 고른다. 검사결과·조제상태는 Kafka(토픽 확정 대기)로 상태만 받고 결과 본문은 단건 조회로 읽는다(응급 DB에 결과 본문을 저장하지 않는다).
+- 처방 목록은 처방코어의 `GET …/prescriptions?receptionId=`를 호출한다(개발 서버에서 확인). 응급 화면은 환자를 고르면 이 목록을 불러오고, 투약(MAR)·처치 기록의 `orderId`는 이 목록에서 고른다.
+- **검사 결과는 응급 DB에 저장하지 않고 처방 단건 조회에서 그대로 전달한다.** 항목(`items[]`)에 `resultReportedAt`과 `resultDetails[]`(`detailName`, `resultValue`, `resultUnit`, `referenceRange`, `abnormalFlag` L/H/N)가 온다. 결과는 LAB → 처방코어로 비동기로 도착하므로 화면은 결과가 올 때까지 30초마다(최대 10분) 목록을 다시 불러오고, 그 뒤에는 Refresh로 직접 확인한다. 응급이 LAB 결과 토픽(`lab.lab-result.reported.v1`)을 직접 구독하지는 않는다(결과 본문을 저장하지 않는 규칙상 보여줄 곳이 없다).
+- **결과를 받는 검사는 01~04뿐이다**(01 Blood Glucose, 02 CBC, 03 Liver Function, 04 Urinalysis). 05 Blood Culture, 06 Urine Culture, 07 Histopathology, 08 Cytology(배양·병리)는 받는 결과항목이 없고 처방코어도 반영하지 않는다(전체 MSA 카탈로그 점검 I-04). 화면은 이 검사에 "결과 대기" 대신 안내만 보이고 자동 새로고침 대상에서도 뺀다. **수술·영상 오더는 이번 범위에서 제외**한다.
+- **LAB 거절 사유**: 검사 전송이 `FAILED`일 때 항목의 `rejectReason`을 그대로 전달한다(예: "유효하지 않은 환자ID입니다" = LAB에 없는 환자, "이미 접수된 오더입니다" = 중복 전송). 중복 전송은 처방코어가 항목을 FAILED로 덮어쓰지만 LAB은 이미 받은 상태이므로 `labOrderId`가 있거나 거절 사유가 "이미 접수"이면 전송 완료(SENT)로 계산한다.
+- **검사항목 목록은 응급 서버가 10분간 캐시**한다(`app.order.lab-item-cache-minutes`, 기본 10). 처방코어가 일시적으로 응답하지 못하면 마지막으로 받은 목록을 대신 돌려준다(캐시가 없을 때만 502). 이름·코드 필터는 응급 서버에서 한다.
 
 ---
 
@@ -160,7 +164,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | PAT | POST | `/api/patients/batch-query` | 목록 N+1 방지 |
 | PAT | GET | `/api/patients/{patientId}/safety-info` | 알레르기 SoT |
 | PAT | GET | `/api/patients/{patientId}/guardians/*` | 보호자 |
-| ADM | GET | `/api/admin/commonCodes/groups/{groupCode}` | KTAS 등 공유코드 |
+| ADM | GET | `/api/admin/commonCodeGroup/list`, `/api/admin/commonCodeItem/list?groupId=` | 공통코드(기동 시 전체 캐시). 구경로 `/api/commonCodeGroup/list`는 admin이 제거 예정이라 신경로 사용 |
 | ADM | GET | `/api/admin/medicalDepts` | 진료과 |
 | ADM | GET | `/api/staff/employees/{employeeId}` | 직원 |
 | RCP | GET | `/receptions/{receptionId}` | 접수 상세 |

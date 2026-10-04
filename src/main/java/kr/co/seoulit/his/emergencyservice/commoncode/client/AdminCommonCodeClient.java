@@ -20,6 +20,9 @@ import java.util.List;
  * (features/commonCode/api/commonCodeGroupApi.ts, commonCodeItemApi.ts) 기준으로 맞춘 것 —
  * emergency-service 자체 문서(docs/api.md)의 /api/admin/commonCodes/groups/{groupCode} 는
  * 실제로 존재하지 않는 경로였음 (오래된 문서, 프론트 실제 연동 코드로 재확인 후 수정).
+ *
+ * 신경로(/api/admin/commonCodeGroup/list, /api/admin/commonCodeItem/list)를 쓴다. 구경로(/api/commonCodeGroup/list …)는
+ * admin 이 "팀 전환 후 제거 예정"이라고 한 경로다(전체 MSA API 카탈로그 정합성 점검 I-02, 2026-10-02).
  */
 @Component
 @RequiredArgsConstructor
@@ -30,9 +33,9 @@ public class AdminCommonCodeClient {
     @Value("${app.admin.base-url}")
     private String adminBaseUrl;
 
-    /** GET /api/commonCodeGroup/list — 전체 그룹 목록 */
+    /** GET /api/admin/commonCodeGroup/list — 전체 그룹 목록 */
     public List<AdminCommonCodeGroupDto> getGroups() {
-        String url = adminBaseUrl + "/api/commonCodeGroup/list";
+        String url = adminBaseUrl + "/api/admin/commonCodeGroup/list";
 
         ResponseEntity<AdminApiResponse<List<AdminCommonCodeGroupDto>>> response = restTemplate.exchange(
                 url,
@@ -45,9 +48,9 @@ public class AdminCommonCodeClient {
         return body != null && body.getData() != null ? body.getData() : List.of();
     }
 
-    /** GET /api/commonCodeItem/list?groupId= — 그룹별 항목 목록 */
+    /** GET /api/admin/commonCodeItem/list?groupId= — 그룹별 항목 목록 */
     public List<AdminCommonCodeItemDto> getItems(String groupId) {
-        String url = UriComponentsBuilder.fromUriString(adminBaseUrl + "/api/commonCodeItem/list")
+        String url = UriComponentsBuilder.fromUriString(adminBaseUrl + "/api/admin/commonCodeItem/list")
                 .queryParam("groupId", groupId)
                 .toUriString();
 

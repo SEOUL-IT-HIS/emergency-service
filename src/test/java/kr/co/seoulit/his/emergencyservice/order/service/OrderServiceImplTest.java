@@ -78,8 +78,13 @@ class OrderServiceImplTest {
     }
 
     private OrderServiceImpl newService(boolean forwardVerbalYn) {
+        return newService(forwardVerbalYn, 10);
+    }
+
+    private OrderServiceImpl newService(boolean forwardVerbalYn, long labItemCacheMinutes) {
         CommonCodeCache cache = new CommonCodeCache();
-        return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress, "10", forwardVerbalYn);
+        return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress,
+                "10", forwardVerbalYn, labItemCacheMinutes);
     }
 
     private OrderItemDto lab() {
@@ -261,7 +266,7 @@ class OrderServiceImplTest {
         cbc.setItemName("CBC");
         cbc.setTestClassification("GENERAL");
         cbc.setSpecimenTypes(List.of("BLOOD"));
-        when(client.searchLabItems("cb")).thenReturn(List.of(cbc));
+        when(client.searchLabItems(null)).thenReturn(List.of(cbc));
 
         List<LabItemDto> items = service.searchLabItems("cb");
 
@@ -416,5 +421,71 @@ class OrderServiceImplTest {
         assertThat(dto.getOrderId()).isEqualTo(ORDER_ID);
         assertThat(dto.getLabDispatchStatus()).isEqualTo("FAILED");
         assertThat(dto.getPharmacyDispatchStatus()).isEqualTo("SENT");
+    }
+
+    private OrderCoreLabItem labItem(String code, String name) {
+        OrderCoreLabItem item = new OrderCoreLabItem();
+        item.setItemCode(code);
+        item.setItemName(name);
+        item.setTestClassification("GENERAL");
+        item.setSpecimenTypes(List.of("BLOOD"));
+        return item;
+    }
+
+    @Test
+    void labItemListIsFetchedOnceAndFilteredHereWhileTheCacheIsFresh() {
+        when(client.searchLabItems(null)).thenReturn(List.of(labItem("01", "Blood Glucose Test"), labItem("02", "CBC")));
+
+        assertThat(service.searchLabItems(null)).hasSize(2);
+        assertThat(service.searchLabItems("cbc")).extracting(LabItemDto::getItemCode).containsExactly("02");
+        assertThat(service.searchLabItems("01")).extracting(LabItemDto::getItemName).containsExactly("Blood Glucose Test");
+        assertThat(service.searchLabItems("zzz")).isEmpty();
+
+        verify(client, org.mockito.Mockito.times(1)).searchLabItems(null);     // 처방코어에는 한 번만 물었다
+    }
+
+    @Test
+    void aStaleLabItemListAnswersWhenTheOrderCoreCannotReachTheLab() {
+        OrderServiceImpl alwaysAsk = newService(false, 0);                       // 캐시를 쓰지 않고 매번 처방코어에 묻는 설정
+        when(client.searchLabItems(null))
+                .thenReturn(List.of(labItem("02", "CBC")))
+                .thenThrow(new ExternalServiceException("order core error (search lab items): Failed to search lab items."));
+
+        assertThat(alwaysAsk.searchLabItems(null)).hasSize(1);                   // 처음엔 정상
+        assertThat(alwaysAsk.searchLabItems("cbc")).extracting(LabItemDto::getItemCode)   // LAB 연결이 끊긴 순간에도 받아 둔 목록으로 응답
+                .containsExactly("02");
+        verify(client, org.mockito.Mockito.times(2)).searchLabItems(null);
+    }
+
+    @Test
+    void theErrorIsPassedOnWhenThereIsNoListToFallBackOn() {
+        when(client.searchLabItems(null)).thenThrow(new ExternalServiceException("order core is not reachable"));
+
+        assertThatThrownBy(() -> service.searchLabItems(null)).isInstanceOf(ExternalServiceException.class);
+    }
+
+    @Test
+    void aLabItemTheLabAlreadyReceivedCountsAsSentEvenWhenTheOrderCoreMarkedItFailed() {
+        // 같은 처방을 다시 전송하면 LAB 이 "이미 접수된 오더"로 거절하고 처방코어가 항목을 FAILED 로 덮어쓴다
+        OrderItemDto duplicate = lab();
+        duplicate.setSendStatus("FAILED");
+        duplicate.setRejectReason("이미 접수된 오더입니다. (labOrderNo=abc)");
+        OrderCorePrescription received = new OrderCorePrescription();
+        received.setPrescriptionId(ORDER_ID);
+        received.setItems(List.of(duplicate));
+        assertThat(OrderServiceImpl.labSendStatusOf(received)).isEqualTo("SENT");
+
+        OrderItemDto withLabNo = lab();
+        withLabNo.setSendStatus("FAILED");
+        withLabNo.setLabOrderId("lab-130");
+        received.setItems(List.of(withLabNo));
+        assertThat(OrderServiceImpl.labSendStatusOf(received)).isEqualTo("SENT");
+
+        // 진짜 거절(유효하지 않은 환자ID)은 FAILED 그대로
+        OrderItemDto rejected = lab();
+        rejected.setSendStatus("FAILED");
+        rejected.setRejectReason("유효하지 않은 환자ID입니다. (patientId=x)");
+        received.setItems(List.of(rejected));
+        assertThat(OrderServiceImpl.labSendStatusOf(received)).isEqualTo("FAILED");
     }
 }
