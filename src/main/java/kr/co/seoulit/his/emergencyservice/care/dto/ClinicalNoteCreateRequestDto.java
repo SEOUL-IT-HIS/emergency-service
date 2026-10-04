@@ -7,6 +7,7 @@ import lombok.Setter;
 @Setter
 public class ClinicalNoteCreateRequestDto {
     private String encounterId;
+    private String noteTypeCode;
     private String content;
     private String recordedById;
 }

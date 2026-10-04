@@ -24,6 +24,9 @@ public class ClinicalNote {
     @Column(name = "RECORDED_BY_ID", length = 36)
     private String recordedById;
 
+    @Column(name = "NOTE_TYPE_CODE", length = 30)
+    private String noteTypeCode;
+
     @Column(name = "CONTENT", length = 4000)
     private String content;
 

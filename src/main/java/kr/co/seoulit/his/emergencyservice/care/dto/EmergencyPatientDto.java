@@ -15,4 +15,6 @@ public class EmergencyPatientDto {
     private String bedNo;
     private String zoneCode;
     private LocalDateTime lastAssessedAt;
+    private String memo;
+    private String chiefComplaintRaw;
 }

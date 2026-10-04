@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 public class TreatmentCreateRequestDto {
     private String encounterId;
-    private Long orderId;
+    private String orderId;
     private String treatmentCode;
     private String description;
     private String performedById;

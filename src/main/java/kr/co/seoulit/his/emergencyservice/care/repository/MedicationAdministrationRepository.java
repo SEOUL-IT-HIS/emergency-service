@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface MedicationAdministrationRepository extends JpaRepository<MedicationAdministration, String> {
     List<MedicationAdministration> findByReceptionId(String receptionId);
+    List<MedicationAdministration> findByReceptionIdOrderByAdministeredAtAsc(String receptionId);
 }

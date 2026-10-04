@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 public class TreatmentRecordDto {
     private String id;
     private String receptionId;
-    private Long orderId;
+    private String orderId;
     private String treatmentTypeCode;
     private String description;
     private String performedById;

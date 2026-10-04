@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.triage.controller;
 
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
+import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
 import kr.co.seoulit.his.emergencyservice.triage.dto.*;
 import kr.co.seoulit.his.emergencyservice.triage.service.TriageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,8 @@ import java.util.List;
 public class TriageController {
 
     private final TriageService triageService;
+    // 분류자·측정자·시행자는 로그인한 사용자로 기록한다. 격리 결정자(decidedById)는 화면에서 의사를 골라 보내므로 요청값을 그대로 쓴다.
+    private final LoginUserResolver loginUser;
 
     @Operation(summary = "EMS 정보 조회", description = "UC-TRI-01 · 119 이송정보 조회 (연계:EMS)")
     @GetMapping("/ems-info")
@@ -34,6 +37,7 @@ public class TriageController {
     @Operation(summary = "KTAS 등급 분류", description = "UC-TRI-02 · 최초 중증도 분류")
     @PostMapping("/ktas")
     public ApiResponse<TriageAssessmentDto> createKtas(@RequestBody KtasCreateRequestDto request) {
+        request.setAssessedById(loginUser.actorOr(request.getAssessedById()));
         return ApiResponse.success(triageService.createKtas(request));
     }
 
@@ -42,6 +46,7 @@ public class TriageController {
     public ApiResponse<TriageAssessmentDto> updateKtas(
             @PathVariable String id,
             @RequestBody KtasUpdateRequestDto request) {
+        request.setAssessedById(loginUser.actorOr(request.getAssessedById()));
         return ApiResponse.success(triageService.updateKtas(id, request));
     }
 
@@ -55,6 +60,7 @@ public class TriageController {
     @PostMapping("/vital-assessments")
     public ApiResponse<List<EwsRecordDto>> createVitalAssessments(
             @RequestBody VitalAssessmentCreateRequestDto request) {
+        request.setMeasuredById(loginUser.actorOr(request.getMeasuredById()));
         return ApiResponse.success(triageService.createVitalAssessments(request));
     }
 
@@ -87,6 +93,7 @@ public class TriageController {
     @PostMapping("/risk-screenings")
     public ApiResponse<RiskScreeningDto> createRiskScreening(
             @RequestBody RiskScreeningCreateRequestDto request) {
+        request.setScreenedById(loginUser.actorOr(request.getScreenedById()));
         return ApiResponse.success(triageService.createRiskScreening(request));
     }
 }

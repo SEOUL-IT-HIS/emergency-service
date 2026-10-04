@@ -4,12 +4,14 @@
 # ============================================================
 
 server:
-  port: 8085
+  port: 8089
   servlet:
     session:
+      timeout: 10h
       cookie:
-        same-site: none
-        secure: true
+        http-only: true
+        path: /
+        same-site: lax
 
 app:
   api:
@@ -20,15 +22,48 @@ app:
     allowed-origin-patterns:
       - http://localhost:3000
       - http://127.0.0.1:3000
+      - http://117.16.154.233:18080
+      - http://seoulit.pe.kr:18080
+      - http://localhost:18080
+  auth:
+    # true 면 /api/emergency/** 를 로그인(Redis 세션) 없이 부를 때 401. 서버끼리 부르는 API(접수의 중복 접수 확인·접수 정보 전송)는 제외한다.
+    # admin 이 만든 세션을 읽을 수 있는 환경(같은 Redis)에서 로그인한 브라우저로 확인한 뒤 켠다. 꺼 둬도 세션이 있으면 처리자 ID 는 세션의 empId 로 기록한다.
+    required: ${AUTH_REQUIRED:false}
   admin:
-    # admin-service 공통코드 API base-url. 개인 PC: application-local.yml 에서 override
-    base-url: http://192.168.1.128:8080
+    # admin-service 공통코드 API base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.128:9191
+    base-url: ${ADMIN_BASE_URL:http://localhost:9191}
+  patient:
+    # patient-service 배치조회 base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시: http://192.168.1.128:8087
+    base-url: ${PATIENT_BASE_URL:http://localhost:8087}
+  order:
+    # 처방코어(OPD, outpatient-service) base-url. 공용서버 배포 기준(localhost) — 개인 PC 개발 시 application-local.yml 에서 덮어쓴다
+    base-url: ${ORDER_BASE_URL:http://localhost:8088}
+    # 응급의학과 코드(ADM DEPT_CD)
+    department-code: "10"
+    # 구두처방 verbalYn(Y/N)을 처방코어로 전달한다(2026-10-02 처방코어 안내). 문제가 생기면 false 로 끈다
+    forward-verbal-yn: true
+    # 검사항목 목록을 처방코어에서 받아 두는 시간(분). 처방코어↔LAB 연결이 끊겨 검색이 실패해도 받아 둔 목록으로 응답한다. 0이면 매번 처방코어에 묻는다
+    lab-item-cache-minutes: 10
+  kafka:
+    # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
+    intake:
+      enabled: true
+    # 입원요청(응급→병동) Kafka 연동. 켤 때만 true(개인 PC 개발용 값은 application-local.yml 에 둔다). 토픽 기본값: emergency.admission.requested.v1 /
+    # inpatient.admission.bed-assigned.v1 / inpatient.admission.rejected.v1 (app.kafka.admission.*-topic 으로 변경 가능)
+    admission:
+      enabled: true
 
 spring:
   application:
     name: emergency-service
   config:
     import: optional:classpath:application-local.yml
+  data:
+    redis:
+      # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD:}
   datasource:
     url: jdbc:oracle:thin:@//seoulit.pe.kr:1521/FREEPDB1
     username: emergency
@@ -42,6 +77,18 @@ spring:
       hibernate:
         format_sql: true
         default_schema: EMERGENCY
+  kafka:
+    # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126:9092
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: emergency-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: kr.co.seoulit.his.emergencyservice.care.messaging.dto
+        spring.json.value.default.type: kr.co.seoulit.his.emergencyservice.care.messaging.dto.ReceptionIntakeEvent
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

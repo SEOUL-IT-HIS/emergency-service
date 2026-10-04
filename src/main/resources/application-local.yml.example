@@ -11,3 +11,10 @@
 #     properties:
 #       hibernate:
 #         default_schema: PUBLIC
+#
+# 로컬 Kafka로 테스트하려면 (docker-compose.kafka.yml로 브로커 먼저 기동):
+# ---
+# app:
+#   kafka:
+#     intake:
+#       enabled: true

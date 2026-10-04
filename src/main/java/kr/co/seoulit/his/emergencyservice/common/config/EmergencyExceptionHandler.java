@@ -2,11 +2,14 @@ package kr.co.seoulit.his.emergencyservice.common.config;
 
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
+import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
+import kr.co.seoulit.his.emergencyservice.common.exception.UnauthenticatedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -16,8 +19,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * 모든 에러 응답을 ApiResponse{code, message, data=null} 형태로 통일한다.
  *
  * 400: 요청 값 오류 / 파싱 실패
+ * 401: 로그인 필요 (app.auth.required=true 일 때)
  * 404: 대상 리소스 없음
  * 409: 리소스 상태 충돌
+ * 502: 연계 서비스(처방코어 등) 호출 실패
  * 500: 처리되지 않은 서버 오류 (내부 메시지 노출 금지)
  */
 @RestControllerAdvice(basePackages = "kr.co.seoulit.his.emergencyservice")
@@ -38,6 +43,19 @@ public class EmergencyExceptionHandler {
         return ApiResponse.error("EMG_BAD_REQUEST", "Unable to parse the request body (JSON).");
     }
 
+    // 필수 쿼리 파라미터 누락(예: GET /dispositions 에 receptionId 없음) — 없으면 500으로 떨어짐
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingParameter(MissingServletRequestParameterException exception) {
+        return ApiResponse.error("EMG_BAD_REQUEST", exception.getParameterName() + " is required");
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiResponse<Void> handleUnauthenticated(UnauthenticatedException exception) {
+        return ApiResponse.error("EMG_UNAUTHENTICATED", exception.getMessage());
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleNotFound(ResourceNotFoundException exception) {
@@ -48,6 +66,12 @@ public class EmergencyExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleConflict(ConflictException exception) {
         return ApiResponse.error("EMG_CONFLICT", exception.getMessage());
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiResponse<Void> handleExternalService(ExternalServiceException exception) {
+        return ApiResponse.error("EMG_UPSTREAM_ERROR", exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

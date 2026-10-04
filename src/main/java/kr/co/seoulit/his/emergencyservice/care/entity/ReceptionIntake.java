@@ -21,8 +21,8 @@ public class ReceptionIntake {
     @Column(name = "PATIENT_NAME", length = 100)
     private String patientName;
 
-    @Column(name = "ARRIVAL_PATH", length = 50)
-    private String arrivalPath;
+    @Column(name = "ARRIVAL_PATH_CODE", length = 50)
+    private String arrivalPathCode;
 
     @Column(name = "RECEIVED_AT")
     private LocalDateTime receivedAt;

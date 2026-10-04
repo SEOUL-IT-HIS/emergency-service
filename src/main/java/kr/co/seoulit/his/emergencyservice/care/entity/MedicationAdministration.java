@@ -21,11 +21,11 @@ public class MedicationAdministration {
     @Column(name = "RECEPTION_ID", length = 36)
     private String receptionId;
 
-    @Column(name = "ORDER_ID", nullable = false)
-    private Long orderId;
+    @Column(name = "ORDER_ID", length = 36, nullable = false)
+    private String orderId;
 
-    @Column(name = "ORDER_ITEM_ID")
-    private Long orderItemId;
+    @Column(name = "ORDER_ITEM_ID", length = 36)
+    private String orderItemId;
 
     @Column(name = "DRUG_CODE", length = 20)
     private String drugCode;

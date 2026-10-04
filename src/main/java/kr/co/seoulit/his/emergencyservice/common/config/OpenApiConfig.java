@@ -18,8 +18,8 @@ import java.util.Map;
 
 /**
  * Swagger(OpenAPI 3) 문서 메타 정보.
- * UI: http://localhost:8085/swagger-ui/index.html
- * JSON: http://localhost:8085/v3/api-docs
+ * UI: http://localhost:8089/swagger-ui/index.html
+ * JSON: http://localhost:8089/v3/api-docs
  *
  * 문서화 범위 = EMG(UD2)가 Provider로 직접 제공하는 API만.
  * 처방 SoT는 GR2(/api/orders*)이며, EMG는 이를 Consumer로 호출할 뿐이므로 여기 노출하지 않는다.
@@ -27,7 +27,7 @@ import java.util.Map;
 @Configuration
 public class OpenApiConfig {
 
-    @Value("${app.api.base-url:http://localhost:8085}")
+    @Value("${app.api.base-url:http://localhost:8089}")
     private String baseUrl;
 
     @Bean
