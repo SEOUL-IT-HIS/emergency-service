@@ -17,6 +17,29 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 ---
 
+## 1-1. 로그인과 처리자 ID
+
+로그인은 admin이 처리한다. admin이 Redis에 세션(`SessionUser`: empId, empName …)을 저장하고 브라우저에 `SESSION` 쿠키를 주면, 응급은 같은 쿠키로 같은 세션을 읽는다(`spring-session-data-redis`). 세션 속성 이름은 몰라도 `SessionUser` 타입으로 찾는다. 세션이 없거나 읽을 수 없으면(로그인 안 함, 만료) "로그인 정보 없음"으로 본다. 참고: Redis가 응답하지 않으면 SESSION 쿠키가 있는 요청은 Spring MVC가 요청 맨 앞에서 세션을 읽다가 500이 난다 — 응급 코드 이전의 프레임워크 동작이라 응급만의 문제가 아니며, Redis가 살아 있는 서버에서는 해당 없다.
+
+**처리자 ID는 화면이 보낸 값이 아니라 세션의 empId로 기록한다.** 요청에 실린 값은 바꿔 보낼 수 있어서, 세션이 있으면 요청값을 무시하고 로그인 사용자로 덮어쓴다(다르면 서버 로그에 남긴다). 세션이 없는 환경(단독 실행 등)에서만 요청값을 그대로 쓴다.
+
+| 로그인 사용자로 기록(요청값 무시) | 요청값 그대로(화면에서 의사를 골라 보냄) |
+| --- | --- |
+| 진료기록 `recordedById`, 동의 `recordedById`, CPR 이벤트 `recordedById`, 처치 `performedById`, 투약 `administeredById`, KTAS `assessedById`(분류·재평가), 활력징후 `measuredById`, 위험 스크리닝 `screenedById`, 병상 `assignedById`·`releasedById`, 장기체류 경고 `acknowledgedById`, 처방 취소 `userId` | 처방 `prescribedBy`, 구두처방 확정 `confirmedBy`, 퇴실 결정 `decidedById`, 격리 결정 `decidedById`, 전원소견서 `writtenById` |
+
+의사 칸은 로그인한 사람이 아니라 선택한 의사(구두처방은 간호사가 의사 대신 입력)라서 요청값을 쓴다. 서버가 그 값이 실제 의사인지는 확인하지 않는다(admin 직원 조회가 사용자 세션을 요구한다 — 이후 단계).
+
+**로그인 검사(`app.auth.required`, 환경변수 `AUTH_REQUIRED`, 기본 `false`)**: `true`면 `/api/emergency/**`를 로그인 없이 부를 때 **401** `EMG_UNAUTHENTICATED`를 준다. 아래 두 API는 접수 서비스가 서버끼리 부르는 것이라 쿠키가 없으므로 제외한다(CORS 사전 요청 `OPTIONS`도 통과).
+
+| 제외 API | 호출처 |
+| --- | --- |
+| `GET /api/emergency/care/patients/active` | 접수 — 중복 접수 확인 |
+| `POST /api/emergency/care/reception-intakes` | 접수 — 접수 정보 REST 전송(정식 경로는 Kafka) |
+
+켜기 전에 admin과 같은 Redis 세션을 읽는 환경에서 **로그인한 브라우저로** 확인한다. 공용 axios가 401을 받으면(로그인 상태였을 때) 로그인 화면으로 보낸다.
+
+---
+
 ## 2. EMG Provider API
 
 ### 2.1 ER-TRIAGE

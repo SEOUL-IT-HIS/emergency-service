@@ -3,6 +3,7 @@ package kr.co.seoulit.his.emergencyservice.order.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
+import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
 import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
@@ -22,6 +23,8 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    // 취소자는 로그인한 사용자로 기록한다. 처방의(prescribedBy)·구두 확정 의사(confirmedBy)는 화면에서 의사를 골라 보내므로 요청값을 그대로 쓴다.
+    private final LoginUserResolver loginUser;
 
     @Operation(summary = "응급 처방 등록(검사·약품)",
             description = "encounterId=접수ID. patientId 는 서버가 접수에서 채운다. 구두처방은 지금은 일반 처방으로 등록만 된다. dispatchNow=true 면 등록 직후 검사/약제 전송까지 호출")
@@ -52,6 +55,7 @@ public class OrderController {
     @Operation(summary = "처방 취소", description = "처방코어에는 수정 API가 없다 — 변경은 취소 후 재등록. 삭제가 아니라 상태 변경")
     @PatchMapping("/{orderId}/cancel")
     public ApiResponse<OrderDto> cancelOrder(@PathVariable String orderId, @RequestBody OrderCancelRequestDto request) {
+        request.setUserId(loginUser.actorOr(request.getUserId()));
         return ApiResponse.success(orderService.cancelOrder(orderId, request));
     }
 

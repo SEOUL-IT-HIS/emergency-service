@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
+import kr.co.seoulit.his.emergencyservice.common.exception.UnauthenticatedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * 모든 에러 응답을 ApiResponse{code, message, data=null} 형태로 통일한다.
  *
  * 400: 요청 값 오류 / 파싱 실패
+ * 401: 로그인 필요 (app.auth.required=true 일 때)
  * 404: 대상 리소스 없음
  * 409: 리소스 상태 충돌
  * 502: 연계 서비스(처방코어 등) 호출 실패
@@ -46,6 +48,12 @@ public class EmergencyExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleMissingParameter(MissingServletRequestParameterException exception) {
         return ApiResponse.error("EMG_BAD_REQUEST", exception.getParameterName() + " is required");
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiResponse<Void> handleUnauthenticated(UnauthenticatedException exception) {
+        return ApiResponse.error("EMG_UNAUTHENTICATED", exception.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

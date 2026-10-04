@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordCreateRequestDto
 import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordDto;
 import kr.co.seoulit.his.emergencyservice.care.service.ConsentService;
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
+import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +19,13 @@ import java.util.List;
 public class ConsentController {
 
     private final ConsentService consentService;
+    // 기록자는 로그인한 사용자로 기록한다
+    private final LoginUserResolver loginUser;
 
     @Operation(summary = "동의 기록 등록", description = "동의 기록 · 종이 동의서를 받은 사실만 기록(서명·파일 저장 없음). 유예는 consentStatusCode=DEFERRED + reason")
     @PostMapping
     public ApiResponse<ConsentRecordDto> createConsent(@RequestBody ConsentRecordCreateRequestDto request) {
+        request.setRecordedById(loginUser.actorOr(request.getRecordedById()));
         return ApiResponse.success(consentService.createConsent(request));
     }
 

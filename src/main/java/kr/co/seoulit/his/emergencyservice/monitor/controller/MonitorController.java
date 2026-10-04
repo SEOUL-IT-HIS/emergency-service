@@ -1,6 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.monitor.controller;
 
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
+import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
 import kr.co.seoulit.his.emergencyservice.monitor.dto.*;
 import kr.co.seoulit.his.emergencyservice.monitor.service.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,8 @@ import java.util.List;
 public class MonitorController {
 
     private final MonitorService monitorService;
+    // 확인자는 로그인한 사용자로 기록한다
+    private final LoginUserResolver loginUser;
 
     @Operation(summary = "응급실 종합 현황판", description = "UC-MON-01 · 대시보드")
     @GetMapping("/dashboard")
@@ -36,6 +39,7 @@ public class MonitorController {
     public ApiResponse<LosAlertDto> acknowledgeLongStayAlert(
             @PathVariable String alertId,
             @RequestBody LosAlertAcknowledgeRequestDto request) {
+        request.setAcknowledgedById(loginUser.actorOr(request.getAcknowledgedById()));
         return ApiResponse.success(monitorService.acknowledgeLongStayAlert(alertId, request));
     }
 }
