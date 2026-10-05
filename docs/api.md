@@ -23,11 +23,11 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 **처리자 ID는 화면이 보낸 값이 아니라 세션의 empId로 기록한다.** 요청에 실린 값은 바꿔 보낼 수 있어서, 세션이 있으면 요청값을 무시하고 로그인 사용자로 덮어쓴다(다르면 서버 로그에 남긴다). 세션이 없는 환경(단독 실행 등)에서만 요청값을 그대로 쓴다.
 
-| 로그인 사용자로 기록(요청값 무시) | 요청값 그대로(화면에서 의사를 골라 보냄) |
+| 로그인 사용자로 기록(요청값 무시) | 요청값 그대로(화면에서 직원을 골라 보냄) |
 | --- | --- |
-| 진료기록 `recordedById`, 동의 `recordedById`, CPR 이벤트 `recordedById`, 처치 `performedById`, 투약 `administeredById`, KTAS `assessedById`(분류·재평가), 활력징후 `measuredById`, 위험 스크리닝 `screenedById`, 병상 `assignedById`·`releasedById`, 장기체류 경고 `acknowledgedById`, 처방 취소 `userId` | 처방 `prescribedBy`, 구두처방 확정 `confirmedBy`, 퇴실 결정 `decidedById`, 격리 결정 `decidedById`, 전원소견서 `writtenById` |
+| 진료기록 `recordedById`, 동의 `recordedById`, CPR 이벤트 `recordedById`, KTAS `assessedById`(분류·재평가), 병상 `assignedById`·`releasedById`, 장기체류 경고 `acknowledgedById`, 처방 취소 `userId` | **의사를 지정**: 처방 `prescribedBy`, 구두처방 확정 `confirmedBy`, 퇴실 결정 `decidedById`, 격리 결정 `decidedById`, 전원소견서 `writtenById`<br>**실제로 행위를 한 사람**(기본은 로그인한 사람, 다른 의사·간호사를 고를 수 있음): 처치 `performedById`, 투약 `administeredById`, 활력징후 `measuredById`, 위험 스크리닝 `screenedById` |
 
-의사 칸은 로그인한 사람이 아니라 선택한 의사(구두처방은 간호사가 의사 대신 입력)라서 요청값을 쓴다. 서버가 그 값이 실제 의사인지는 확인하지 않는다(admin 직원 조회가 사용자 세션을 요구한다 — 이후 단계).
+의사 칸은 로그인한 사람이 아니라 선택한 의사(구두처방은 간호사가 의사 대신 입력)라서 요청값을 쓴다. 처치·투약·활력징후·스크리닝은 의사가 시술하고 간호사가 기록하거나 한 간호사가 투여하고 다른 간호사가 기록하는 경우가 있어 실제로 행위를 한 직원을 고르게 하고, 기록 책임(진료기록·동의·CPR·KTAS 등)은 로그인한 사람으로 고정한다. 의사·간호사 목록은 admin 직원의 부서(`DEPT_CD`)별로 묶어 응급의학과(10)를 맨 위에 보여주되 다른 과도 막지 않는다(협진·당직). 서버가 그 값이 실제 의사인지는 확인하지 않는다(admin 직원 조회가 사용자 세션을 요구한다 — 이후 단계).
 
 **로그인 검사(`app.auth.required`, 환경변수 `AUTH_REQUIRED`, 기본 `false`)**: `true`면 `/api/emergency/**`를 로그인 없이 부를 때 **401** `EMG_UNAUTHENTICATED`를 준다. 아래 두 API는 접수 서비스가 서버끼리 부르는 것이라 쿠키가 없으므로 제외한다(CORS 사전 요청 `OPTIONS`도 통과).
 
@@ -162,15 +162,16 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | PATCH | `/api/emergency/orders/{orderId}/verbal-confirm` | `PATCH …/{id}/verbal-confirm?confirmedBy=` | 구두처방 사후 확정(본문 `confirmedBy`=의사 ID, 확정 일시·확정자 기록). 구두처방(`verbalYn=Y`)이 아니거나 이미 확정된 처방은 처방코어가 거절 — 409는 409로, 그 외 4xx는 400으로 전달 |
 | PATCH | `/api/emergency/orders/{orderId}/cancel` | `PATCH …/{id}/deactivate?cancelReason=&userId=` | 취소(삭제 아님). **수정 API는 없음 — 변경은 취소 후 재등록** |
 | POST | `/api/emergency/orders/{orderId}/dispatch-lab` | `POST …/{id}/dispatch-lab` | 검사(LAB) 전송. 자동 호출이 아니라 응급이 직접 호출 |
-| POST | `/api/emergency/orders/{orderId}/dispatch-pharmacy` | `POST …/{id}/dispatch-pharmacy` | 약제(PHM) 전송 |
+| POST | `/api/emergency/orders/{orderId}/dispatch-pharmacy` | `POST …/{id}/dispatch-pharmacy` | 약제(PHM) 전송. **기본 비활성(`app.order.pharmacy-enabled=false`) — 호출하면 409 `EMG_CONFLICT`** (아래 "약제 제외" 참고) |
 
 - **영상(방사선) 오더는 제외**: 처방코어가 받지 않는다. `items[].prescriptionType`은 `"검사"`·`"약품"`만 허용(그 외 400).
-- `dispatchNow=true` 이면 등록 직후 검사 항목은 `dispatch-lab`, 약품 항목은 `dispatch-pharmacy`까지 호출한다. 등록은 이미 끝났으므로 전송이 실패해도 되돌리지 않고 응답의 `labDispatchStatus`/`pharmacyDispatchStatus`로 알리며, 전송 API로 다시 시도한다. 값은 `SENT`/`FAILED`/`PENDING`/`REQUESTED`(상태를 못 읽음)/`NOT_APPLICABLE`(해당 항목 없음).
+- `dispatchNow=true` 이면 등록 직후 검사 항목은 `dispatch-lab`, 약품 항목은 `dispatch-pharmacy`까지 호출한다(**약제 전송이 꺼져 있으면 약품은 호출하지 않고 `pharmacyDispatchStatus=NOT_APPLICABLE`**). 등록은 이미 끝났으므로 전송이 실패해도 되돌리지 않고 응답의 `labDispatchStatus`/`pharmacyDispatchStatus`로 알리며, 전송 API로 다시 시도한다. 값은 `SENT`/`FAILED`/`PENDING`/`REQUESTED`(상태를 못 읽음)/`NOT_APPLICABLE`(해당 항목 없음).
 - **전송 호출 성공(HTTP 200)과 실제 전송 성공은 다르다.** 실서버(처방코어 개발 서버)에서 `dispatch-lab`이 200을 주고도 검사 항목이 `FAILED`(labOrderId 없음)로 남는 것을 확인했다. 그래서 응급은 전송 호출 직후 처방을 다시 읽어 **실제 전송 상태**를 돌려주고(`dispatch-lab`/`dispatch-pharmacy` 응답의 `status`), 처방코어가 비동기로 상태를 바꾸는 경우를 위해 화면은 전송·등록 뒤 목록을 다시 불러온다.
 - **구두처방**(2026-10-02 처방코어 안내 반영): `verbalYn=Y`로 등록하면 `orderMethod=02`(구두)로, 아니면 `01`(전자)로 보내고(ADM `ORDER_METHOD_CD`: 01 Electronic / 02 Verbal / 03 Telephone), `verbalYn`(Y/N)도 같이 전달한다(`app.order.forward-verbal-yn`, 기본 true — 문제가 생기면 false로 끌 수 있다). 사후 확정은 위 `verbal-confirm`. 응답에 `orderMethodName`(예: Verbal)과 확정 일시·확정자(`verbalConfirmedAt`/`verbalConfirmedBy`)가 온다. 처방코어 개발 서버(2026-10-02~03)에서 등록·목록·단건·구두 확정·취소·검사 전송까지 확인했다.
 - 우선순위·시점 코드는 처방코어가 잘못된 값도 그대로 저장하므로 **응급이 호출 전에 검증**(admin 공통코드, 없으면 폴백)한다.
 - 오류: 처방코어 4xx → 400(메시지 포함), 404 → 404, 5xx·타임아웃·연결 실패 → **502** `EMG_UPSTREAM_ERROR`.
 - 설정: `app.order.base-url`(기본 `http://localhost:8088`, 환경변수 `ORDER_BASE_URL`), `app.order.department-code`(`10`), `app.order.forward-verbal-yn`(`false`).
+- **약제 제외(약제 서비스 미참여)**: 약제(PHM) 서비스가 이번 범위에서 빠져 약제 전송은 쓰지 않는다. 전송해도 받는 곳이 없는데 처방코어는 `SENT`로 표시해 약제로 넘어간 것처럼 보이기 때문이다(개발 서버에서 확인). `app.order.pharmacy-enabled`(기본 `false`)가 꺼져 있으면 등록 직후 전송에서 약품을 건너뛰고(`NOT_APPLICABLE`), `POST …/dispatch-pharmacy`는 409로 거절한다. 검사(LAB) 전송은 그대로다. **약품 처방 등록과 투약(MAR) 기록은 그대로 쓴다** — 투약 기록은 처방(`orderId`)이 필요하고, 처방 등록은 처방코어에 저장만 한다(약제 Kafka와 무관). 약품 검색(`GET …/medications/search`)은 처방코어가 약제 서비스에 의존해 500(`OPD999`)이라 쓰지 않고 약품 코드·이름을 직접 입력한다. 약제 조제 상태 조회(UC-ORD-08)와 조제 요청 연동(UC-ORD-07)은 범위 제외. 약제 서비스가 돌아오면 `pharmacy-enabled=true`(백엔드)와 프론트 `PHARMACY_DISPATCH_ENABLED=true`로 다시 켠다.
 - 처방 목록은 처방코어의 `GET …/prescriptions?receptionId=`를 호출한다(개발 서버에서 확인). 응급 화면은 환자를 고르면 이 목록을 불러오고, 투약(MAR)·처치 기록의 `orderId`는 이 목록에서 고른다.
 - **검사 결과는 응급 DB에 저장하지 않고 처방 단건 조회에서 그대로 전달한다.** 항목(`items[]`)에 `resultReportedAt`과 `resultDetails[]`(`detailName`, `resultValue`, `resultUnit`, `referenceRange`, `abnormalFlag` L/H/N)가 온다. 결과는 LAB → 처방코어로 비동기로 도착하므로 화면은 결과가 올 때까지 30초마다(최대 10분) 목록을 다시 불러오고, 그 뒤에는 Refresh로 직접 확인한다. 응급이 LAB 결과 토픽(`lab.lab-result.reported.v1`)을 직접 구독하지는 않는다(결과 본문을 저장하지 않는 규칙상 보여줄 곳이 없다).
 - **결과를 받는 검사는 01~04뿐이다**(01 Blood Glucose, 02 CBC, 03 Liver Function, 04 Urinalysis). 05 Blood Culture, 06 Urine Culture, 07 Histopathology, 08 Cytology(배양·병리)는 받는 결과항목이 없고 처방코어도 반영하지 않는다(전체 MSA 카탈로그 점검 I-04). 화면은 이 검사에 "결과 대기" 대신 안내만 보이고 자동 새로고침 대상에서도 뺀다. **수술·영상 오더는 이번 범위에서 제외**한다.

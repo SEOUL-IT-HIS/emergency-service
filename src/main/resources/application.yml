@@ -42,6 +42,8 @@ app:
     department-code: "10"
     # 구두처방 verbalYn(Y/N)을 처방코어로 전달한다(2026-10-02 처방코어 안내). 문제가 생기면 false 로 끈다
     forward-verbal-yn: true
+    # 약제(PHM) 전송 사용 여부. 약제 서비스가 이번 범위에서 빠져 기본 false — 켜면 등록 직후 전송과 POST /orders/{id}/dispatch-pharmacy 가 다시 동작한다
+    pharmacy-enabled: false
     # 검사항목 목록을 처방코어에서 받아 두는 시간(분). 처방코어↔LAB 연결이 끊겨 검색이 실패해도 받아 둔 목록으로 응답한다. 0이면 매번 처방코어에 묻는다
     lab-item-cache-minutes: 10
   kafka:

@@ -82,9 +82,13 @@ class OrderServiceImplTest {
     }
 
     private OrderServiceImpl newService(boolean forwardVerbalYn, long labItemCacheMinutes) {
+        return newService(forwardVerbalYn, labItemCacheMinutes, true);
+    }
+
+    private OrderServiceImpl newService(boolean forwardVerbalYn, long labItemCacheMinutes, boolean pharmacyEnabled) {
         CommonCodeCache cache = new CommonCodeCache();
         return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress,
-                "10", forwardVerbalYn, labItemCacheMinutes);
+                "10", forwardVerbalYn, labItemCacheMinutes, pharmacyEnabled);
     }
 
     private OrderItemDto lab() {
@@ -487,5 +491,31 @@ class OrderServiceImplTest {
         rejected.setRejectReason("유효하지 않은 환자ID입니다. (patientId=x)");
         received.setItems(List.of(rejected));
         assertThat(OrderServiceImpl.labSendStatusOf(received)).isEqualTo("FAILED");
+    }
+
+    @Test
+    void withPharmacyDisabledADrugOrderIsNeverSentToPharmacy() {
+        // 약제 서비스가 없는 배포 — 처방코어는 전송하면 SENT 로 표시하지만 받는 곳이 없다
+        OrderServiceImpl noPharmacy = newService(false, 10, false);
+        OrderCreateRequestDto both = request(lab(), drug());
+        both.setDispatchNow(true);
+
+        OrderDto dto = noPharmacy.createOrder(both);
+
+        verify(client).dispatchLab(ORDER_ID);                              // 검사는 그대로 전송
+        verify(client, never()).dispatchPharmacy(anyString());             // 약제는 호출하지 않는다
+        assertThat(dto.getLabDispatchStatus()).isEqualTo("SENT");
+        assertThat(dto.getPharmacyDispatchStatus()).isEqualTo("NOT_APPLICABLE");
+    }
+
+    @Test
+    void withPharmacyDisabledTheDispatchEndpointRefusesInsteadOfCallingTheOrderCore() {
+        OrderServiceImpl noPharmacy = newService(false, 10, false);
+
+        assertThatThrownBy(() -> noPharmacy.dispatchPharmacy(ORDER_ID))
+                .isInstanceOf(kr.co.seoulit.his.emergencyservice.common.exception.ConflictException.class)
+                .hasMessageContaining("disabled");
+        verify(client, never()).dispatchPharmacy(anyString());
+        assertThat(noPharmacy.dispatchLab(ORDER_ID).getTarget()).as("검사 전송은 영향 없음").isEqualTo("LAB");
     }
 }

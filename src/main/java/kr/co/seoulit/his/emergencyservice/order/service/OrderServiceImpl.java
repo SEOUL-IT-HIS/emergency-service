@@ -2,6 +2,7 @@ package kr.co.seoulit.his.emergencyservice.order.service;
 
 import kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake;
 import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
+import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ExternalServiceException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
@@ -64,6 +65,8 @@ public class OrderServiceImpl implements OrderService {
     private final DischargeProgress dischargeProgress;
     private final String departmentCode;
     private final boolean forwardVerbalYn;
+    /** 약제(PHM) 전송을 쓰는지. 약제 서비스가 이번 배포에 없으면 false — 전송해도 받는 곳이 없다 */
+    private final boolean pharmacyEnabled;
     private final Duration labItemCacheTtl;
     /** 마지막으로 처방코어에서 받은 검사항목 전체 목록 — 처방코어↔LAB 연결이 잠깐 끊겨도 화면이 버티게 한다 */
     private volatile CachedLabItems labItemCache;
@@ -75,13 +78,15 @@ public class OrderServiceImpl implements OrderService {
                             CommonCodeResolver codeResolver, DischargeProgress dischargeProgress,
                             @Value("${app.order.department-code:10}") String departmentCode,
                             @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn,
-                            @Value("${app.order.lab-item-cache-minutes:10}") long labItemCacheMinutes) {
+                            @Value("${app.order.lab-item-cache-minutes:10}") long labItemCacheMinutes,
+                            @Value("${app.order.pharmacy-enabled:false}") boolean pharmacyEnabled) {
         this.orderCoreClient = orderCoreClient;
         this.receptionIntakeRepository = receptionIntakeRepository;
         this.codeResolver = codeResolver;
         this.dischargeProgress = dischargeProgress;
         this.departmentCode = departmentCode;
         this.forwardVerbalYn = forwardVerbalYn;
+        this.pharmacyEnabled = pharmacyEnabled;
         this.labItemCacheTtl = Duration.ofMinutes(Math.max(labItemCacheMinutes, 0));
     }
 
@@ -124,7 +129,10 @@ public class OrderServiceImpl implements OrderService {
         if (request.isDispatchNow()) {
             // 등록은 이미 끝났다 — 전송이 실패해도 등록을 되돌리지 않고 상태만 알린다(전송 API 로 다시 시도)
             dto.setLabDispatchStatus(dispatchIfAny(created.getPrescriptionId(), request.getItems(), TYPE_LAB, true));
-            dto.setPharmacyDispatchStatus(dispatchIfAny(created.getPrescriptionId(), request.getItems(), TYPE_DRUG, false));
+            // 약제 서비스가 없으면 약품이 있어도 전송하지 않는다(처방코어가 SENT 로 표시해도 받는 곳이 없다)
+            dto.setPharmacyDispatchStatus(pharmacyEnabled
+                    ? dispatchIfAny(created.getPrescriptionId(), request.getItems(), TYPE_DRUG, false)
+                    : DISPATCH_NOT_APPLICABLE);
         }
         log.info("응급 처방 등록 - orderId={}, receptionId={}, 항목 {}건", created.getPrescriptionId(), receptionId,
                 request.getItems().size());
@@ -249,6 +257,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderDispatchDto dispatchPharmacy(String orderId) {
         requireOrderId(orderId);
+        if (!pharmacyEnabled) {
+            // 약제 전송은 지금 쓰지 않습니다(약제 서비스가 이 배포에 없음).
+            throw new ConflictException("pharmacy dispatch is disabled: the pharmacy service is not part of this deployment (app.order.pharmacy-enabled=false)");
+        }
         orderCoreClient.dispatchPharmacy(orderId);
         return dispatched(orderId, "PHARMACY", sendStatusAfterDispatch(orderId, false));
     }
