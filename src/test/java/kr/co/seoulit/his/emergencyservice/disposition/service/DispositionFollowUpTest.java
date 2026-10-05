@@ -262,6 +262,9 @@ class DispositionFollowUpTest {
         when(dispositionRepository.save(any(Disposition.class))).thenAnswer(inv -> {
             Disposition d = inv.getArgument(0);
             d.setId("d-saved");
+            // 연속 저장이 같은 시계 눈금에 찍히면 어느 결정이 더 늦은지 가릴 수 없어(최신 결정은 decidedAt 이 더 늦은 것)
+            // 저장 순서대로 결정 시각을 벌려 둔다 — 나중에 저장한 결정이 최신
+            d.setDecidedAt(java.time.LocalDateTime.now().plusSeconds(store.size()));
             store.add(d);
             return d;
         });

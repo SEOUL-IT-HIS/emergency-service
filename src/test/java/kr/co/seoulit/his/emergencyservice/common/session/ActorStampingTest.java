@@ -51,8 +51,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 로그인 사용자가 처리자인 칸은 화면이 보낸 값이 아니라 세션의 empId 로 기록된다.
- * 의사를 골라 보내는 칸(처방의·구두 확정 의사·퇴실/격리 결정자·전원소견서 작성자)은 보낸 값이 그대로 간다.
+ * 로그인 사용자가 기록자인 칸은 화면이 보낸 값이 아니라 세션의 empId 로 기록된다.
+ * 화면에서 직원을 골라 보내는 칸은 보낸 값이 그대로 간다 — 의사 칸(처방의·구두 확정 의사·퇴실/격리 결정자·전원소견서 작성자)과
+ * 실제로 행위를 한 사람 칸(처치 시행자·투약 투여자·활력징후 측정자·스크리닝 시행자, 기본값은 로그인한 사람이지만 다른 직원을 고를 수 있다).
  */
 class ActorStampingTest {
 
@@ -76,7 +77,7 @@ class ActorStampingTest {
         mvc.perform(request).andExpect(status().isOk());
     }
 
-    // ---------------------------------------------------------------- 로그인 사용자가 처리자인 칸
+    // ---------------------------------------------------------------- 로그인 사용자가 기록자인 칸 + 실제 행위자를 고르는 칸
 
     @Test
     void clinicalNoteRecorder() throws Exception {
@@ -90,25 +91,25 @@ class ActorStampingTest {
     }
 
     @Test
-    void treatmentPerformer() throws Exception {
+    void treatmentPerformerIsTheChosenStaff() throws Exception {
         CareService service = mock(CareService.class);
         send(new CareController(service, resolver), post("/api/emergency/care/treatments"),
-                "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"treatmentCode\":\"01\",\"performedById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"treatmentCode\":\"01\",\"performedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<TreatmentCreateRequestDto> captor = ArgumentCaptor.forClass(TreatmentCreateRequestDto.class);
         verify(service).createTreatment(captor.capture());
-        assertThat(captor.getValue().getPerformedById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getPerformedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
-    void medicationAdministrator() throws Exception {
+    void medicationAdministratorIsTheChosenStaff() throws Exception {
         CareService service = mock(CareService.class);
         send(new CareController(service, resolver), post("/api/emergency/care/medication-administrations"),
-                "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"drugCode\":\"d\",\"administeredById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"drugCode\":\"d\",\"administeredById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<MarCreateRequestDto> captor = ArgumentCaptor.forClass(MarCreateRequestDto.class);
         verify(service).createMar(captor.capture());
-        assertThat(captor.getValue().getAdministeredById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getAdministeredById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
@@ -151,25 +152,25 @@ class ActorStampingTest {
     }
 
     @Test
-    void vitalsMeasurer() throws Exception {
+    void vitalsMeasurerIsTheChosenStaff() throws Exception {
         TriageService service = mock(TriageService.class);
         send(new TriageController(service, resolver), post("/api/emergency/triage/vital-assessments"),
-                "{\"encounterId\":\"r1\",\"vitals\":[{\"heartRate\":80}]}", true);
+                "{\"encounterId\":\"r1\",\"measuredById\":\"EMP-OTHER\",\"vitals\":[{\"heartRate\":80}]}", true);
 
         ArgumentCaptor<VitalAssessmentCreateRequestDto> captor = ArgumentCaptor.forClass(VitalAssessmentCreateRequestDto.class);
         verify(service).createVitalAssessments(captor.capture());
-        assertThat(captor.getValue().getMeasuredById()).as("보내지 않아도 로그인 사용자로 채워진다").isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getMeasuredById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
-    void riskScreeningScreener() throws Exception {
+    void riskScreeningScreenerIsTheChosenStaff() throws Exception {
         TriageService service = mock(TriageService.class);
         send(new TriageController(service, resolver), post("/api/emergency/triage/risk-screenings"),
-                "{\"encounterId\":\"r1\",\"screenType\":\"SEPSIS\",\"screenedById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"screenType\":\"SEPSIS\",\"screenedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<RiskScreeningCreateRequestDto> captor = ArgumentCaptor.forClass(RiskScreeningCreateRequestDto.class);
         verify(service).createRiskScreening(captor.capture());
-        assertThat(captor.getValue().getScreenedById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getScreenedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test

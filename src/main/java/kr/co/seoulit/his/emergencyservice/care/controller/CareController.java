@@ -18,7 +18,9 @@ import java.util.List;
 public class CareController {
 
     private final CareService careService;
-    // 처리자(기록자·시행자·투여자)는 로그인한 사용자로 기록한다 — 요청에 실린 값은 바꿔 보낼 수 있다
+    // 기록자(진료기록·CPR 이벤트)는 로그인한 사용자로 기록한다 — 요청에 실린 값은 바꿔 보낼 수 있다.
+    // 처치 시행자(performedById)·투약 투여자(administeredById)는 실제로 한 사람이 기록하는 사람과 다를 수 있어
+    // 화면에서 고른 직원(기본은 로그인한 사람)을 요청값 그대로 쓴다.
     private final LoginUserResolver loginUser;
 
     @Operation(summary = "응급환자 목록 조회", description = "UC-CARE-01 · 접수 유입 환자목록 + 초기 임상정보 (연계:RCP)")
@@ -60,7 +62,6 @@ public class CareController {
     @Operation(summary = "응급 처치 기록", description = "UC-CARE-03 · 처치기록(orderId=GR2 참조 권장)")
     @PostMapping("/treatments")
     public ApiResponse<TreatmentRecordDto> createTreatment(@RequestBody TreatmentCreateRequestDto request) {
-        request.setPerformedById(loginUser.actorOr(request.getPerformedById()));
         return ApiResponse.success(careService.createTreatment(request));
     }
 
@@ -73,7 +74,6 @@ public class CareController {
     @Operation(summary = "약물 투여 기록(MAR)", description = "UC-CARE-04 · 투여기록. 처방자장은 GR2, orderId 필수 권장")
     @PostMapping("/medication-administrations")
     public ApiResponse<MarDto> createMar(@RequestBody MarCreateRequestDto request) {
-        request.setAdministeredById(loginUser.actorOr(request.getAdministeredById()));
         return ApiResponse.success(careService.createMar(request));
     }
 
