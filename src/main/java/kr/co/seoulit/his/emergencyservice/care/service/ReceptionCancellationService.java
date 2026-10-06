@@ -135,7 +135,7 @@ public class ReceptionCancellationService {
     private static final String RECORD_ORDER = "ORDER";
 
     /**
-     * 사람이 남긴 진료 기록의 종류(응급 DB 기준, 처방은 따로 본다). 접수가 넣어준 KTAS(RECEPTION)와 자동 알림은 기록으로 보지 않는다.
+     * 사람이 남긴 진료 기록의 종류(응급 DB 기준, 처방은 따로 본다). 접수가 넣어준 KTAS(RECEPTION)·자동 알림·해제한 병상 배정은 기록으로 보지 않는다.
      * 앞의 코드는 응답에 그대로 나간다.
      */
     private List<String> recordsOf(String id) {
@@ -151,7 +151,8 @@ public class ReceptionCancellationService {
         if (isolationAssessmentRepository.existsByReceptionId(id)) found.add("ISOLATION");
         if (riskScreeningRepository.existsByReceptionId(id)) found.add("RISK_SCREENING");
         if (emsReferralRepository.existsByReceptionId(id)) found.add("EMS_REFERRAL");
-        if (bedAssignmentRepository.existsByReceptionId(id)) found.add("BED_ASSIGNMENT");
+        // 병상은 해제한 이력은 기록으로 세지 않는다(해제하면 병상이 비고 남는 것이 없다). 지금 배정 중이면 취소하면 병상이 점유된 채 남으므로 막는다
+        if (bedAssignmentRepository.existsByReceptionIdAndReleasedAtIsNull(id)) found.add("BED_ASSIGNMENT");
         if (dispositionRepository.existsByReceptionId(id)) found.add("DISPOSITION");
         return found;
     }

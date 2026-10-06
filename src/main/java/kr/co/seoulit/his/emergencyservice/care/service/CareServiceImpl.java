@@ -224,6 +224,7 @@ public class CareServiceImpl implements CareService {
                     "encounterId, orderId, administeredAt, dose, drugCode, routeCode, administeredById are required");
         }
         dischargeProgress.requireNotCancelled(request.getEncounterId());
+        dischargeProgress.requireEventTimeDuringStay(request.getEncounterId(), request.getAdministeredAt(), "administeredAt");
         // 투여경로는 admin 기존 그룹 ADMIN_ROUTE_CD(01 PO, 02 IV ...) — 그룹이 없으면 폴백
         codeResolver.require("routeCode", request.getRouteCode(),
                 codeResolver.valueSet(EmgCodes.ADMIN_ROUTE_GROUP, EmgCodes.ADMIN_ROUTE_FALLBACK));
@@ -249,6 +250,8 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException("encounterId and events[] are required");
         }
         dischargeProgress.requireNotCancelled(request.getEncounterId());
+        request.getEvents().forEach(item ->
+                dischargeProgress.requireEventTimeDuringStay(request.getEncounterId(), item.getEventAt(), "eventAt"));
         if (StringUtils.hasText(request.getOutcomeCode())) {
             codeResolver.require("outcomeCode", request.getOutcomeCode(),
                     codeResolver.valueSet(EmgCodes.CPR_OUTCOME_GROUP, EmgCodes.CPR_OUTCOME_FALLBACK));

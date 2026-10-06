@@ -105,8 +105,8 @@ class ReceptionCancellationServiceTest {
     }
 
     @Test
-    void 병상_배정_이력이_있으면_거절한다() {
-        when(beds.existsByReceptionId("r-1")).thenReturn(true);
+    void 지금_병상에_배정돼_있으면_거절한다() {
+        when(beds.existsByReceptionIdAndReleasedAtIsNull("r-1")).thenReturn(true);
         assertThat(service.cancel("r-1", CANCELLED)).isEqualTo(Result.REFUSED_HAS_RECORDS);
     }
 
@@ -152,7 +152,7 @@ class ReceptionCancellationServiceTest {
     @Test
     void checkListsEveryKindOfRecordItFinds() {
         when(notes.existsByReceptionId("r-1")).thenReturn(true);
-        when(beds.existsByReceptionId("r-1")).thenReturn(true);
+        when(beds.existsByReceptionIdAndReleasedAtIsNull("r-1")).thenReturn(true);
         TriageAssessment byNurse = new TriageAssessment();
         byNurse.setAssessedById("nurse-1");
         when(triage.findByReceptionId("r-1")).thenReturn(List.of(byNurse));
@@ -200,5 +200,14 @@ class ReceptionCancellationServiceTest {
     void checkRequiresAReceptionId() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.check(" "))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 병상을_배정했다가_해제했으면_기록으로_보지_않고_취소한다() {
+        // 해제 이력은 남아 있어도(existsByReceptionId 는 true 가 될 수 있다) 지금 배정 중이 아니면 막지 않는다
+        when(beds.existsByReceptionIdAndReleasedAtIsNull("r-1")).thenReturn(false);
+
+        assertThat(service.check("r-1").isCancellable()).isTrue();
+        assertThat(service.cancel("r-1", CANCELLED)).isEqualTo(Result.CANCELLED);
     }
 }

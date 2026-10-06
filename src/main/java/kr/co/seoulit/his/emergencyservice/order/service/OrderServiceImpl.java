@@ -10,6 +10,7 @@ import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
+import kr.co.seoulit.his.emergencyservice.order.dto.MedicationDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
@@ -142,6 +143,30 @@ public class OrderServiceImpl implements OrderService {
                     return dto;
                 })
                 .sorted(Comparator.comparing(OrderDto::getPrescribedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    /** 약품 검색 결과를 화면에 한 번에 내려주는 최대 건수 */
+    static final int MEDICATION_SEARCH_LIMIT = 30;
+
+    @Override
+    public List<MedicationDto> searchMedications(String name) {
+        if (!StringUtils.hasText(name)) {
+            // 이름 없이 부르면 처방코어가 500 을 주므로 호출하지 않는다
+            throw new IllegalArgumentException("name is required");
+        }
+        return orderCoreClient.searchMedications(name.trim()).stream()
+                .filter(core -> StringUtils.hasText(core.getEdiCode()) && StringUtils.hasText(core.getMedicationName()))
+                .limit(MEDICATION_SEARCH_LIMIT)
+                .map(core -> {
+                    MedicationDto dto = new MedicationDto();
+                    dto.setItemCode(core.getEdiCode());
+                    dto.setItemName(core.getMedicationName());
+                    dto.setFormName(core.getFormCodeName());
+                    dto.setManufacturer(core.getEntpName());
+                    dto.setCategory(core.getEtcOtcName());
+                    return dto;
+                })
                 .toList();
     }
 

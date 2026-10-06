@@ -257,6 +257,58 @@ class OrderServiceImplTest {
         assertThat(dto.getVerbalConfirmedBy()).isEqualTo("dr-9");
     }
 
+    private static kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication medication(String name, String edi) {
+        var m = new kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication();
+        m.setMedicationId("1");
+        m.setMedicationName(name);
+        m.setEdiCode(edi);
+        m.setFormCodeName("주사제");
+        m.setEntpName("제조사");
+        m.setEtcOtcName("전문의약품");
+        return m;
+    }
+
+    @Test
+    void medicationSearchUsesTheEdiCodeAsTheItemCode() {
+        when(client.searchMedications("케토")).thenReturn(List.of(medication("케토로락주 30mg", "ER-KETO-30")));
+
+        var found = service.searchMedications("  케토 ");   // 공백은 뗀다
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0).getItemCode()).isEqualTo("ER-KETO-30");
+        assertThat(found.get(0).getItemName()).isEqualTo("케토로락주 30mg");
+        assertThat(found.get(0).getFormName()).isEqualTo("주사제");
+    }
+
+    @Test
+    void medicationSearchNeedsANameAndNeverCallsTheOrderCoreWithoutOne() {
+        assertThatThrownBy(() -> service.searchMedications(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.searchMedications(null)).isInstanceOf(IllegalArgumentException.class);
+        verify(client, never()).searchMedications(anyString());
+    }
+
+    @Test
+    void medicationSearchSkipsEntriesWithoutACodeAndCapsTheResult() {
+        var many = new java.util.ArrayList<kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication>();
+        many.add(medication("코드 없는 약", null));
+        for (int i = 0; i < 40; i++) {
+            many.add(medication("약" + i, "C" + i));
+        }
+        when(client.searchMedications("약")).thenReturn(many);
+
+        var found = service.searchMedications("약");
+
+        assertThat(found).hasSize(OrderServiceImpl.MEDICATION_SEARCH_LIMIT);
+        assertThat(found).noneMatch(m -> "코드 없는 약".equals(m.getItemName()));
+    }
+
+    @Test
+    void medicationSearchPassesTheOrderCoreOutageOn() {
+        when(client.searchMedications("약")).thenThrow(new ExternalServiceException("order core is not reachable"));
+
+        assertThatThrownBy(() -> service.searchMedications("약")).isInstanceOf(ExternalServiceException.class);
+    }
+
     @Test
     void dispatchNowSendsLabAndPharmacyOnlyForTheItemTypesPresent() {
         OrderCreateRequestDto labOnly = request(lab());

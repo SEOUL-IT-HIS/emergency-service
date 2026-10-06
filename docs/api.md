@@ -149,6 +149,12 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 - 화면이 미리 막도록 `GET /dispositions`·`POST /dispositions` 응답의 최신 결정에 `stage`(NONE/OPEN/WAITING_WARD/DONE)를 내려준다. 화면은 DONE이면 위 패널의 등록 버튼을 비활성화하고 안내를 보여 준다.
 - 이유: 퇴실한 환자에게 병상을 배정하면 퇴실 이벤트가 다시 오지 않아 병상이 영구 점유로 남는다.
 
+**사건 시각 범위(투약 `administeredAt`·CPR 이벤트 `eventAt`·동의 `receivedAt`)** — 기록을 입력하는 시점은 퇴실 뒤여도 되지만(사후 기록), 기록에 적는 "그때 있었던 일"의 시각은 응급실에 있던 동안이어야 한다. 벗어나면 **400** `EMG_BAD_REQUEST`.
+- 접수 시각보다 이를 수 없다 — `<필드> must not be before the reception time`
+- 현재보다 미래일 수 없다(시계 차이 5분 허용) — `<필드> must not be in the future`
+- 귀가·사망·자의퇴원은 퇴실 결정 시각보다 늦을 수 없다(입원·전원은 병상·소견서가 나올 때까지 응급실에 있으므로 상한 없음) — `<필드> must not be after the discharge time`
+- 시각을 보내지 않으면(지금으로 채움) 확인하지 않는다. 화면은 같은 범위를 날짜 선택(`min`/`max`)과 칸 아래 안내로 미리 보여 준다.
+
 ---
 
 ## 3-1. 응급 처방 연동 — 처방코어(OPD) 호출 (검사·약품만)
@@ -159,6 +165,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- |
 | POST | `/api/emergency/orders` | `POST /api/outpatient/prescriptions/emergency/{receptionId}` | 검사·약품 처방 등록. 본문 `encounterId`(접수ID), `prescribedBy`, `priorityCode`(ORDER_PRIORITY_CD, STAT=01), `timingCode`(ORDER_TIMING_CD 01/02/03), `items[]`, 선택 `verbalYn`(Y/N), `dispatchNow`. `patientId`·`serviceType="ER"`·`departmentCode="10"`·`orderMethod="01"`은 서버가 채움 |
 | GET | `/api/emergency/orders?encounterId=` | `GET /api/outpatient/prescriptions?receptionId=` | 접수의 처방 목록(최근 처방 먼저). items 없는 가벼운 목록 — 처방ID·상태·`priorityCode`와 전송 상태 요약(`labSendStatus`: 검사 항목 중 하나라도 FAILED면 FAILED, 미전송/PENDING이 있으면 PENDING, 전부 SENT면 SENT, 검사 항목이 없으면 null / `pharmacySendStatus`: 처방 단위 PENDING·SENT·FAILED). 상세·검사결과는 단건 조회 |
+| GET | `/api/emergency/orders/medications?name=` | `GET /api/outpatient/prescriptions/medications/search?name=` | 약품 검색(처방 등록 때 약품 선택). 약품명 일부 `name` 필수(없으면 400 — 처방코어가 이름 없이는 500이라 호출하지 않는다). 응답 `itemCode`(약품 마스터 `ediCode`, 외래 처방 화면도 이 값을 쓴다)·`itemName`·`formName`·`manufacturer`·`category`, 최대 30건. 처방코어가 응답하지 못하면 502 |
 | GET | `/api/emergency/orders/{orderId}` | `GET /api/outpatient/prescriptions/{id}` | 처방 단건 |
 | PATCH | `/api/emergency/orders/{orderId}/verbal-confirm` | `PATCH …/{id}/verbal-confirm?confirmedBy=` | 구두처방 사후 확정(본문 `confirmedBy`=의사 ID, 확정 일시·확정자 기록). 구두처방(`verbalYn=Y`)이 아니거나 이미 확정된 처방은 처방코어가 거절 — 409는 409로, 그 외 4xx는 400으로 전달 |
 | PATCH | `/api/emergency/orders/{orderId}/cancel` | `PATCH …/{id}/deactivate?cancelReason=&userId=` | 취소(삭제 아님). **수정 API는 없음 — 변경은 취소 후 재등록** |
@@ -172,7 +179,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 - 우선순위·시점 코드는 처방코어가 잘못된 값도 그대로 저장하므로 **응급이 호출 전에 검증**(admin 공통코드, 없으면 폴백)한다.
 - 오류: 처방코어 4xx → 400(메시지 포함), 404 → 404, 5xx·타임아웃·연결 실패 → **502** `EMG_UPSTREAM_ERROR`.
 - 설정: `app.order.base-url`(기본 `http://localhost:8088`, 환경변수 `ORDER_BASE_URL`), `app.order.department-code`(`10`), `app.order.forward-verbal-yn`(`false`).
-- **약제 제외(약제 서비스 미참여)**: 약제(PHM) 서비스가 이번 범위에서 빠져 약제 전송은 쓰지 않는다. 전송해도 받는 곳이 없는데 처방코어는 `SENT`로 표시해 약제로 넘어간 것처럼 보이기 때문이다(개발 서버에서 확인). `app.order.pharmacy-enabled`(기본 `false`)가 꺼져 있으면 등록 직후 전송에서 약품을 건너뛰고(`NOT_APPLICABLE`), `POST …/dispatch-pharmacy`는 409로 거절한다. 검사(LAB) 전송은 그대로다. **약품 처방 등록과 투약(MAR) 기록은 그대로 쓴다** — 투약 기록은 처방(`orderId`)이 필요하고, 처방 등록은 처방코어에 저장만 한다(약제 Kafka와 무관). 약품 검색(`GET …/medications/search`)은 처방코어가 약제 서비스에 의존해 500(`OPD999`)이라 쓰지 않고 약품 코드·이름을 직접 입력한다. 약제 조제 상태 조회(UC-ORD-08)와 조제 요청 연동(UC-ORD-07)은 범위 제외. 약제 서비스가 돌아오면 `pharmacy-enabled=true`(백엔드)와 프론트 `PHARMACY_DISPATCH_ENABLED=true`로 다시 켠다.
+- **약제 제외(약제 서비스 미참여)**: 약제(PHM) 서비스가 이번 범위에서 빠져 약제 전송은 쓰지 않는다. 전송해도 받는 곳이 없는데 처방코어는 `SENT`로 표시해 약제로 넘어간 것처럼 보이기 때문이다(개발 서버에서 확인). `app.order.pharmacy-enabled`(기본 `false`)가 꺼져 있으면 등록 직후 전송에서 약품을 건너뛰고(`NOT_APPLICABLE`), `POST …/dispatch-pharmacy`는 409로 거절한다. 검사(LAB) 전송은 그대로다. **약품 처방 등록과 투약(MAR) 기록은 그대로 쓴다** — 투약 기록은 처방(`orderId`)이 필요하고, 처방 등록은 처방코어에 저장만 한다(약제 Kafka와 무관). 약품 검색은 처방코어 약품 마스터(`GET …/medications/search`)를 쓴다 — 약제 서비스 전송과는 별개다. 처방코어가 500을 주는 때가 있어(`OPD999`·`OPD006`), 검색이 실패하면 화면은 자주 쓰는 약(Common ER drugs)과 코드·이름 직접 입력으로 대신한다. 약제 조제 상태 조회(UC-ORD-08)와 조제 요청 연동(UC-ORD-07)은 범위 제외. 약제 서비스가 돌아오면 `pharmacy-enabled=true`(백엔드)와 프론트 `PHARMACY_DISPATCH_ENABLED=true`로 다시 켠다.
 - 처방 목록은 처방코어의 `GET …/prescriptions?receptionId=`를 호출한다(개발 서버에서 확인). 응급 화면은 환자를 고르면 이 목록을 불러오고, 투약(MAR)·처치 기록의 `orderId`는 이 목록에서 고른다.
 - **검사 결과는 응급 DB에 저장하지 않고 처방 단건 조회에서 그대로 전달한다.** 항목(`items[]`)에 `resultReportedAt`과 `resultDetails[]`(`detailName`, `resultValue`, `resultUnit`, `referenceRange`, `abnormalFlag` L/H/N)가 온다. 결과는 LAB → 처방코어로 비동기로 도착하므로 화면은 결과가 올 때까지 30초마다(최대 10분) 목록을 다시 불러오고, 그 뒤에는 Refresh로 직접 확인한다. 응급이 LAB 결과 토픽(`lab.lab-result.reported.v1`)을 직접 구독하지는 않는다(결과 본문을 저장하지 않는 규칙상 보여줄 곳이 없다).
 - **결과를 받는 검사는 01~04뿐이다**(01 Blood Glucose, 02 CBC, 03 Liver Function, 04 Urinalysis). 05 Blood Culture, 06 Urine Culture, 07 Histopathology, 08 Cytology(배양·병리)는 받는 결과항목이 없고 처방코어도 반영하지 않는다(전체 MSA 카탈로그 점검 I-04). 화면은 이 검사에 "결과 대기" 대신 안내만 보이고 자동 새로고침 대상에서도 뺀다. **수술·영상 오더는 이번 범위에서 제외**한다.
@@ -236,7 +243,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 - 처음 보는 필드는 무시한다(`JsonDeserializer`가 모르는 필드로 실패하지 않는다).
 - 취소는 접수를 지우지 않고 `RECEPTION_INTAKE.CANCELLED_AT`에 취소 시각(`occurredAt`)을 남긴다. 취소된 접수는 환자 목록(`GET /care/patients`)에서 `status=CANCELLED`로 따로 조회한다(`careStatusCode=CANCELLED`). `IN_CARE`·`DONE` 조회에는 나오지 않고, 상태를 비운 전체 조회에는 나온다. 현황판 재실 환자·장기체류 알림·진행 중 접수 조회(`GET /care/patients/active`)에서는 빠진다. 병상 배정·KTAS·활력징후·격리·위험 스크리닝·처방 등록에 더해 진료기록·처치·투약·CPR·동의 등록도 409(`reception cancelled`)로 거절하고(퇴실 완료 환자는 이 사후 기록 5가지를 허용하지만 취소된 접수는 막는다), 같은 접수의 등록 이벤트는 409(`reception already cancelled`)로 거절한다.
-- **진료 기록이 있는 접수는 취소하지 않고 거절한다**(로그 `접수 취소 거절`). 기록 = 진료기록·처치·투약·CPR·동의·직원이 입력한 KTAS·활력징후·격리·위험 스크리닝·EMS 의뢰·병상 배정(해제 이력 포함)·퇴실 결정·처방코어의 처방. 접수가 넣어준 KTAS(`assessedById=RECEPTION`)와 장기체류 자동 알림은 기록으로 보지 않는다. 처방코어에서 처방 여부를 확인하지 못해도 거절한다.
+- **진료 기록이 있는 접수는 취소하지 않고 거절한다**(로그 `접수 취소 거절`). 기록 = 진료기록·처치·투약·CPR·동의·직원이 입력한 KTAS·활력징후·격리·위험 스크리닝·EMS 의뢰·지금 배정 중인 병상(해제한 배정은 기록으로 세지 않는다)·퇴실 결정·처방코어의 처방. 접수가 넣어준 KTAS(`assessedById=RECEPTION`)와 장기체류 자동 알림은 기록으로 보지 않는다. 처방코어에서 처방 여부를 확인하지 못해도 거절한다.
 - Kafka라 거절을 접수에 되돌려 줄 수 없다 — 거절은 응급 서버 로그로만 남는다.
 - 응급에 없는 접수의 취소는 건너뛴다(등록 이벤트를 못 받은 경우). 이미 취소된 접수의 취소가 다시 와도 처음 취소 시각을 유지한다.
 - DB: `scripts/alter-reception-intake-add-cancelled-at.sql` 을 새 코드보다 먼저 실행해야 한다.
@@ -258,7 +265,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | `HAS_RECORDS` | false | 진료 기록이 있다 — 취소 이벤트를 받아도 응급은 취소하지 않는다. `records`에 종류 |
 | `CANNOT_VERIFY` | false | 처방코어에서 처방 여부를 확인하지 못했다 — 잠시 뒤 다시 조회 |
 
-`records` 값: `CLINICAL_NOTE`(진료기록) · `TREATMENT`(처치) · `MEDICATION`(투약) · `CPR` · `CONSENT`(동의) · `KTAS`(직원이 입력한 KTAS) · `VITAL_SIGNS`(활력징후) · `ISOLATION`(격리) · `RISK_SCREENING` · `EMS_REFERRAL` · `BED_ASSIGNMENT`(병상 배정, 해제 이력 포함) · `DISPOSITION`(퇴실 결정) · `ORDER`(처방코어 처방). 접수가 넣어준 KTAS는 기록으로 보지 않는다. `receptionId`가 비면 400. 로그인 검사(`app.auth.required`)에서 제외한다(서버끼리 호출).
+`records` 값: `CLINICAL_NOTE`(진료기록) · `TREATMENT`(처치) · `MEDICATION`(투약) · `CPR` · `CONSENT`(동의) · `KTAS`(직원이 입력한 KTAS) · `VITAL_SIGNS`(활력징후) · `ISOLATION`(격리) · `RISK_SCREENING` · `EMS_REFERRAL` · `BED_ASSIGNMENT`(지금 배정 중인 병상. 해제한 배정은 제외) · `DISPOSITION`(퇴실 결정) · `ORDER`(처방코어 처방). 접수가 넣어준 KTAS는 기록으로 보지 않는다. `receptionId`가 비면 400. 로그인 검사(`app.auth.required`)에서 제외한다(서버끼리 호출).
 
 ---
 

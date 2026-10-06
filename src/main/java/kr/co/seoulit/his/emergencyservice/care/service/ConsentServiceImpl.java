@@ -78,6 +78,8 @@ public class ConsentServiceImpl implements ConsentService {
         if (receivedAt.isAfter(now.plusMinutes(FUTURE_TOLERANCE_MINUTES))) {
             throw new IllegalArgumentException("receivedAt must not be in the future");
         }
+        // 접수 시각보다 이를 수 없고, 귀가·사망·자의퇴원이면 퇴실 결정 시각보다 늦을 수 없다(요청에 시각이 있을 때만 확인)
+        dischargeProgress.requireEventTimeDuringStay(request.getEncounterId(), request.getReceivedAt(), "receivedAt");
 
         ConsentRecord entity = new ConsentRecord();
         entity.setReceptionId(request.getEncounterId());

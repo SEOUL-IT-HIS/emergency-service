@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
+import kr.co.seoulit.his.emergencyservice.order.dto.MedicationDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
@@ -37,6 +38,12 @@ public class OrderController {
     @GetMapping
     public ApiResponse<List<OrderDto>> listOrders(@RequestParam String encounterId) {
         return ApiResponse.success(orderService.listOrders(encounterId));
+    }
+
+    @Operation(summary = "약품 검색", description = "처방 등록 때 약품(itemCode=약품 마스터 ediCode, itemName)을 고르는 용도. 처방코어 medications/search 호출. name(약품명 일부)이 필수 — 비면 400. 최대 30건. 처방코어가 응답하지 못하면 502")
+    @GetMapping("/medications")
+    public ApiResponse<List<MedicationDto>> searchMedications(@RequestParam String name) {
+        return ApiResponse.success(orderService.searchMedications(name));
     }
 
     @Operation(summary = "처방 단건 조회", description = "처방코어 prescriptionId(= orderId) 기준")

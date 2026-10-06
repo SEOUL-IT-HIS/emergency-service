@@ -20,6 +20,6 @@ public class ReceptionCancellableDto {
      * HAS_RECORDS(진료 기록 있음) · CANNOT_VERIFY(처방코어에서 처방 여부를 확인하지 못함) — cancellable=false
      */
     private String reasonCode;
-    /** reasonCode 가 HAS_RECORDS 일 때 어떤 기록이 있는지(CLINICAL_NOTE, TREATMENT, MEDICATION, CPR, CONSENT, KTAS, VITAL_SIGNS, ISOLATION, RISK_SCREENING, EMS_REFERRAL, BED_ASSIGNMENT, DISPOSITION, ORDER). 아니면 빈 목록 */
+    /** reasonCode 가 HAS_RECORDS 일 때 어떤 기록이 있는지(CLINICAL_NOTE, TREATMENT, MEDICATION, CPR, CONSENT, KTAS, VITAL_SIGNS, ISOLATION, RISK_SCREENING, EMS_REFERRAL, BED_ASSIGNMENT(지금 배정 중인 병상), DISPOSITION, ORDER). 아니면 빈 목록 */
     private List<String> records = List.of();
 }
