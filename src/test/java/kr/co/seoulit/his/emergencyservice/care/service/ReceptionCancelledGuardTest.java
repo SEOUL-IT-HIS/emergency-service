@@ -108,4 +108,75 @@ class ReceptionCancelledGuardTest {
         assertThatThrownBy(() -> guard.requireNotDischarged("r-cancelled"))
                 .isInstanceOf(ConflictException.class).hasMessageContaining("reception cancelled");
     }
+
+    // ---- 취소된 접수에는 진료기록·처치·투약·CPR·동의도 남기지 않는다(퇴실 뒤에는 허용하는 사후 기록이지만 취소된 접수는 다르다)
+
+    private DischargeProgress realGuardWithCancelledReception() {
+        when(receptions.findById("r-cancelled")).thenReturn(Optional.of(intake("r-cancelled", true)));
+        return new DischargeProgress(
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository.class),
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository.class),
+                mock(kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository.class),
+                receptions);
+    }
+
+    private CareServiceImpl careWith(DischargeProgress guard, kr.co.seoulit.his.emergencyservice.care.repository.ClinicalNoteRepository notes,
+                                     kr.co.seoulit.his.emergencyservice.care.repository.TreatmentRecordRepository treatments,
+                                     kr.co.seoulit.his.emergencyservice.care.repository.MedicationAdministrationRepository mars,
+                                     kr.co.seoulit.his.emergencyservice.care.repository.CprEventRepository cprs) {
+        CommonCodeCache cache = new CommonCodeCache();
+        return new CareServiceImpl(notes, treatments, mars, cprs, mock(TriageAssessmentRepository.class),
+                mock(BedAssignmentRepository.class), receptions, cache, new CommonCodeResolver(cache),
+                mock(CareMapstructMapper.class), mock(PatientClient.class), guard);
+    }
+
+    @Test
+    void clinicalNotesTreatmentsMedicationsAndCprAreRejectedOnACancelledReception() {
+        var notes = mock(kr.co.seoulit.his.emergencyservice.care.repository.ClinicalNoteRepository.class);
+        var treatments = mock(kr.co.seoulit.his.emergencyservice.care.repository.TreatmentRecordRepository.class);
+        var mars = mock(kr.co.seoulit.his.emergencyservice.care.repository.MedicationAdministrationRepository.class);
+        var cprs = mock(kr.co.seoulit.his.emergencyservice.care.repository.CprEventRepository.class);
+        CareServiceImpl care = careWith(realGuardWithCancelledReception(), notes, treatments, mars, cprs);
+
+        var note = new kr.co.seoulit.his.emergencyservice.care.dto.ClinicalNoteCreateRequestDto();
+        note.setEncounterId("r-cancelled");
+        note.setNoteTypeCode("01");
+        note.setContent("c");
+        note.setRecordedById("n-1");
+        assertThatThrownBy(() -> care.createRecord(note)).isInstanceOf(ConflictException.class).hasMessageContaining("reception cancelled");
+
+        var treatment = new kr.co.seoulit.his.emergencyservice.care.dto.TreatmentCreateRequestDto();
+        treatment.setEncounterId("r-cancelled");
+        treatment.setOrderId("o-1");
+        treatment.setTreatmentCode("01");
+        treatment.setPerformedById("n-1");
+        assertThatThrownBy(() -> care.createTreatment(treatment)).isInstanceOf(ConflictException.class);
+
+        var mar = new kr.co.seoulit.his.emergencyservice.care.dto.MarCreateRequestDto();
+        mar.setEncounterId("r-cancelled");
+        mar.setOrderId("o-1");
+        mar.setAdministeredAt(LocalDateTime.now());
+        mar.setDose("1");
+        mar.setDrugCode("d");
+        mar.setRouteCode("01");
+        mar.setAdministeredById("n-1");
+        assertThatThrownBy(() -> care.createMar(mar)).isInstanceOf(ConflictException.class);
+
+        var cpr = new kr.co.seoulit.his.emergencyservice.care.dto.CprTimelineCreateRequestDto();
+        cpr.setEncounterId("r-cancelled");
+        cpr.setEvents(List.of(new kr.co.seoulit.his.emergencyservice.care.dto.CprTimelineCreateRequestDto.CprEventItemDto()));
+        assertThatThrownBy(() -> care.createCprTimeline(cpr)).isInstanceOf(ConflictException.class);
+
+        verify(notes, never()).save(any());
+        verify(treatments, never()).save(any());
+        verify(mars, never()).save(any());
+        verify(cprs, never()).save(any());
+    }
+
+    @Test
+    void aDischargedReceptionStillAcceptsFollowUpRecords() {
+        // 퇴실(DONE)은 사후 기록을 허용한다 — 취소만 막는다
+        DischargeProgress guard = realGuardWithCancelledReception();
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> guard.requireNotCancelled("r-ok-not-cancelled"));
+    }
 }

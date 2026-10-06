@@ -101,12 +101,23 @@ public class DischargeProgress {
         if (receptionId == null || receptionId.isBlank()) {
             return;
         }
-        // 접수에서 취소한 접수에도 새로 입력하지 않는다
-        if (receptionIntakeRepository.findById(receptionId).filter(ReceptionIntake::isCancelled).isPresent()) {
-            throw new ConflictException("reception cancelled: " + receptionId);
-        }
+        requireNotCancelled(receptionId);
         if (stage(receptionId) == Stage.DONE) {
             throw new ConflictException("reception already discharged: " + receptionId);
+        }
+    }
+
+    /**
+     * 접수에서 취소한 접수에 입력하려는 요청을 막는다 → ConflictException(409).
+     * 진료기록·처치·투약·CPR·동의처럼 퇴실 뒤에는 허용하는 사후 기록도 취소된 접수에는 남기지 않는다
+     * (목록에서 사라진 접수에 기록이 붙으면 아무도 볼 수 없다).
+     */
+    public void requireNotCancelled(String receptionId) {
+        if (receptionId == null || receptionId.isBlank()) {
+            return;
+        }
+        if (receptionIntakeRepository.findById(receptionId).filter(ReceptionIntake::isCancelled).isPresent()) {
+            throw new ConflictException("reception cancelled: " + receptionId);
         }
     }
 

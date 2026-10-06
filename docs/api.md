@@ -235,7 +235,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | 취소 | `ReceptionCancelled` | `CANCELLED` | 등록과 같은 필드 + eventId(새로), occurredAt(취소 시각) |
 
 - 처음 보는 필드는 무시한다(`JsonDeserializer`가 모르는 필드로 실패하지 않는다).
-- 취소는 접수를 지우지 않고 `RECEPTION_INTAKE.CANCELLED_AT`에 취소 시각(`occurredAt`)을 남긴다. 취소된 접수는 환자 목록(`GET /care/patients`)에서 `status=CANCELLED`로 따로 조회한다(`careStatusCode=CANCELLED`). `IN_CARE`·`DONE` 조회에는 나오지 않고, 상태를 비운 전체 조회에는 나온다. 현황판 재실 환자·장기체류 알림·진행 중 접수 조회(`GET /care/patients/active`)에서는 빠진다. 병상 배정·KTAS·활력징후·격리·위험 스크리닝·처방 등록 같은 새 입력은 409(`reception cancelled`), 같은 접수의 등록 이벤트는 409(`reception already cancelled`)로 거절한다(퇴실 완료 환자와 같은 가드).
+- 취소는 접수를 지우지 않고 `RECEPTION_INTAKE.CANCELLED_AT`에 취소 시각(`occurredAt`)을 남긴다. 취소된 접수는 환자 목록(`GET /care/patients`)에서 `status=CANCELLED`로 따로 조회한다(`careStatusCode=CANCELLED`). `IN_CARE`·`DONE` 조회에는 나오지 않고, 상태를 비운 전체 조회에는 나온다. 현황판 재실 환자·장기체류 알림·진행 중 접수 조회(`GET /care/patients/active`)에서는 빠진다. 병상 배정·KTAS·활력징후·격리·위험 스크리닝·처방 등록에 더해 진료기록·처치·투약·CPR·동의 등록도 409(`reception cancelled`)로 거절하고(퇴실 완료 환자는 이 사후 기록 5가지를 허용하지만 취소된 접수는 막는다), 같은 접수의 등록 이벤트는 409(`reception already cancelled`)로 거절한다.
 - **진료 기록이 있는 접수는 취소하지 않고 거절한다**(로그 `접수 취소 거절`). 기록 = 진료기록·처치·투약·CPR·동의·직원이 입력한 KTAS·활력징후·격리·위험 스크리닝·EMS 의뢰·병상 배정(해제 이력 포함)·퇴실 결정·처방코어의 처방. 접수가 넣어준 KTAS(`assessedById=RECEPTION`)와 장기체류 자동 알림은 기록으로 보지 않는다. 처방코어에서 처방 여부를 확인하지 못해도 거절한다.
 - Kafka라 거절을 접수에 되돌려 줄 수 없다 — 거절은 응급 서버 로그로만 남는다.
 - 응급에 없는 접수의 취소는 건너뛴다(등록 이벤트를 못 받은 경우). 이미 취소된 접수의 취소가 다시 와도 처음 취소 시각을 유지한다.

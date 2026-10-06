@@ -173,6 +173,7 @@ public class CareServiceImpl implements CareService {
                 || !StringUtils.hasText(request.getNoteTypeCode())) {
             throw new IllegalArgumentException("encounterId, noteTypeCode, content, recordedById are required");
         }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
         // 진료기록 종류: admin ER_NOTE_TYPE_CD(초진/재평가/처치/퇴실요약), 그룹이 없으면 폴백
         codeResolver.require("noteTypeCode", request.getNoteTypeCode(),
                 codeResolver.valueSet(EmgCodes.NOTE_TYPE_GROUP, EmgCodes.NOTE_TYPE_FALLBACK));
@@ -197,6 +198,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException(
                     "encounterId, orderId, treatmentCode, performedById are required");
         }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
         codeResolver.require("treatmentCode", request.getTreatmentCode(),
                 codeResolver.valueSet(EmgCodes.TREATMENT_TYPE_GROUP, EmgCodes.TREATMENT_TYPE_FALLBACK));
         TreatmentRecord entity = new TreatmentRecord();
@@ -221,6 +223,7 @@ public class CareServiceImpl implements CareService {
             throw new IllegalArgumentException(
                     "encounterId, orderId, administeredAt, dose, drugCode, routeCode, administeredById are required");
         }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
         // 투여경로는 admin 기존 그룹 ADMIN_ROUTE_CD(01 PO, 02 IV ...) — 그룹이 없으면 폴백
         codeResolver.require("routeCode", request.getRouteCode(),
                 codeResolver.valueSet(EmgCodes.ADMIN_ROUTE_GROUP, EmgCodes.ADMIN_ROUTE_FALLBACK));
@@ -245,6 +248,7 @@ public class CareServiceImpl implements CareService {
                 || request.getEvents() == null || request.getEvents().isEmpty()) {
             throw new IllegalArgumentException("encounterId and events[] are required");
         }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
         if (StringUtils.hasText(request.getOutcomeCode())) {
             codeResolver.require("outcomeCode", request.getOutcomeCode(),
                     codeResolver.valueSet(EmgCodes.CPR_OUTCOME_GROUP, EmgCodes.CPR_OUTCOME_FALLBACK));

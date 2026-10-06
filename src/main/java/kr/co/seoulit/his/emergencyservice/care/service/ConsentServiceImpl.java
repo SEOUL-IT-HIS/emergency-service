@@ -5,6 +5,7 @@ import kr.co.seoulit.his.emergencyservice.care.dto.ConsentRecordDto;
 import kr.co.seoulit.his.emergencyservice.care.entity.ConsentRecord;
 import kr.co.seoulit.his.emergencyservice.care.repository.ConsentRecordRepository;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class ConsentServiceImpl implements ConsentService {
 
     private final ConsentRecordRepository consentRecordRepository;
     private final CommonCodeResolver codeResolver;
+    private final DischargeProgress dischargeProgress;
 
     @Override
     @Transactional
@@ -48,6 +50,7 @@ public class ConsentServiceImpl implements ConsentService {
             throw new IllegalArgumentException(
                     "encounterId, consentTypeCode, consentStatusCode, consentedByCode, recordedById are required");
         }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
         // 동의서 종류는 admin CONSENT_TYPE_CD 중 응급이 쓰기로 한 01·02·05만 허용(수술·마취·침습적 시술)
         Set<String> validTypes = codeResolver.valueSet(EmgCodes.CONSENT_TYPE_GROUP, EmgCodes.CONSENT_TYPE_ALLOWED);
         validTypes.retainAll(EmgCodes.CONSENT_TYPE_ALLOWED);
