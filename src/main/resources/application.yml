@@ -48,6 +48,9 @@ app:
     # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
     intake:
       enabled: true
+      # 접수 이벤트 컨슈머 그룹(기본 emergency-service). 개발 PC가 공용 서버와 같은 브로커를 볼 때는 application-local.yml 에서 PC 전용 그룹으로 바꾼다
+      group-id: emergency-service
+      auto-offset-reset: earliest
     # 입원요청(응급→병동) Kafka 연동. 켤 때만 true(개인 PC 개발용 값은 application-local.yml 에 둔다). 토픽 기본값: emergency.admission.requested.v1 /
     # inpatient.admission.bed-assigned.v1 / inpatient.admission.rejected.v1 (app.kafka.admission.*-topic 으로 변경 가능)
     admission:
