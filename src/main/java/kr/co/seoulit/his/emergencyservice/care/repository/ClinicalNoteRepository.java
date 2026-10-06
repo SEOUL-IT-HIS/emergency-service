@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ClinicalNoteRepository extends JpaRepository<ClinicalNote, String> {
+    boolean existsByReceptionId(String receptionId);
+
     List<ClinicalNote> findByReceptionId(String receptionId);
     List<ClinicalNote> findByReceptionIdOrderByRecordedAtAsc(String receptionId);
 }

@@ -5,5 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface EwsRecordRepository extends JpaRepository<EwsRecord, String> {
+    boolean existsByReceptionId(String receptionId);
+
     List<EwsRecord> findByReceptionId(String receptionId);
 }

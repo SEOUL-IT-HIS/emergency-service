@@ -60,7 +60,8 @@ class MonitorDischargeTest {
         when(admissionRequestRepository.findByDispositionIdIn(anyCollection())).thenReturn(List.of(waiting));
 
         service = new MonitorServiceImpl(losAlertRepository, receptionIntakeRepository,
-                new DischargeProgress(dispositionRepository, admissionRequestRepository, mock(TransferNoteRepository.class)),
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, mock(TransferNoteRepository.class),
+                        org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository.class)),
                 resourceService, patientClient);
     }
 

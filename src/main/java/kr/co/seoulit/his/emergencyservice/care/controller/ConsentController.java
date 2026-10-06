@@ -19,13 +19,13 @@ import java.util.List;
 public class ConsentController {
 
     private final ConsentService consentService;
-    // 기록자는 로그인한 사용자로 기록한다
+    // 기록자는 화면에서 고른 직원이고, 비어 있으면 로그인한 사용자로 채운다
     private final LoginUserResolver loginUser;
 
     @Operation(summary = "동의 기록 등록", description = "동의 기록 · 종이 동의서를 받은 사실만 기록(서명·파일 저장 없음). 유예는 consentStatusCode=DEFERRED + reason")
     @PostMapping
     public ApiResponse<ConsentRecordDto> createConsent(@RequestBody ConsentRecordCreateRequestDto request) {
-        request.setRecordedById(loginUser.actorOr(request.getRecordedById()));
+        request.setRecordedById(loginUser.chosenOrLogin(request.getRecordedById()));
         return ApiResponse.success(consentService.createConsent(request));
     }
 

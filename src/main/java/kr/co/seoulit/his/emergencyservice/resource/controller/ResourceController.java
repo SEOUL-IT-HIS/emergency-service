@@ -18,7 +18,7 @@ import java.util.List;
 public class ResourceController {
 
     private final ResourceService resourceService;
-    // 배정자·해제자는 로그인한 사용자로 기록한다
+    // 배정자·해제자는 화면에서 고른 직원이고, 비어 있으면 로그인한 사용자로 채운다
     private final LoginUserResolver loginUser;
 
     @Operation(summary = "실시간 자원 혼잡도 조회", description = "UC-RES-01 · 과밀화 지표 (연계:NEDIS)")
@@ -38,7 +38,7 @@ public class ResourceController {
     @Operation(summary = "구역-병상 배정", description = "UC-RES-02 · 침상 배당")
     @PostMapping("/bed-assignments")
     public ApiResponse<BedAssignmentDto> assignBed(@RequestBody BedAssignmentCreateRequestDto request) {
-        request.setAssignedById(loginUser.actorOr(request.getAssignedById()));
+        request.setAssignedById(loginUser.chosenOrLogin(request.getAssignedById()));
         return ApiResponse.success(resourceService.assignBed(request));
     }
 
@@ -53,7 +53,7 @@ public class ResourceController {
     public ApiResponse<BedAssignmentDto> releaseBed(
             @PathVariable String assignmentId,
             @RequestBody BedReleaseRequestDto request) {
-        request.setReleasedById(loginUser.actorOr(request.getReleasedById()));
+        request.setReleasedById(loginUser.chosenOrLogin(request.getReleasedById()));
         return ApiResponse.success(resourceService.releaseBed(assignmentId, request));
     }
 }

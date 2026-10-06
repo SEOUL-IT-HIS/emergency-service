@@ -64,15 +64,16 @@ class AuthInterceptorTest {
     }
 
     @Test
-    void theReceptionServiceCanCallItsTwoApisWithoutLogin() {
+    void theReceptionServiceCanCallItsApisWithoutLogin() {
         // 접수 서비스는 서버끼리 부르므로 쿠키(세션)가 없다
         assertThat(pass(true, "GET", "/api/emergency/care/patients/active", false)).isTrue();
         assertThat(pass(true, "GET", "/api/emergency/care/patients/active/", false)).isTrue();
         assertThat(pass(true, "POST", "/api/emergency/care/reception-intakes", false)).isTrue();
+        assertThat(pass(true, "GET", "/api/emergency/care/reception-intakes/cancellable", false)).isTrue();
     }
 
     @Test
-    void onlyThoseTwoApisAreExempt() {
+    void onlyThoseApisAreExempt() {
         assertThatThrownBy(() -> pass(true, "GET", "/api/emergency/care/patients", false))
                 .isInstanceOf(UnauthenticatedException.class);
         assertThatThrownBy(() -> pass(true, "POST", "/api/emergency/care/patients/active", false))

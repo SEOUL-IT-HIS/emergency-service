@@ -51,9 +51,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 로그인 사용자가 기록자인 칸은 화면이 보낸 값이 아니라 세션의 empId 로 기록된다.
- * 화면에서 직원을 골라 보내는 칸은 보낸 값이 그대로 간다 — 의사 칸(처방의·구두 확정 의사·퇴실/격리 결정자·전원소견서 작성자)과
- * 실제로 행위를 한 사람 칸(처치 시행자·투약 투여자·활력징후 측정자·스크리닝 시행자, 기본값은 로그인한 사람이지만 다른 직원을 고를 수 있다).
+ * 처리자 칸은 로그인한 사용자로 덮어쓰지 않는다 — 공용 PC라 로그인한 사람과 실제로 한 사람이 다를 수 있어서,
+ * 화면에서 고른 직원이 그대로 기록되고 비어 있을 때만 로그인한 사용자로 채워진다.
+ * 의사를 골라 보내는 칸(처방의·구두 확정 의사·퇴실/격리 결정자·전원소견서 작성자)도 보낸 값이 그대로 간다.
  */
 class ActorStampingTest {
 
@@ -77,23 +77,23 @@ class ActorStampingTest {
         mvc.perform(request).andExpect(status().isOk());
     }
 
-    // ---------------------------------------------------------------- 로그인 사용자가 기록자인 칸 + 실제 행위자를 고르는 칸
+    // ---------------------------------------------------------------- 고른 직원이 그대로 기록되는 칸
 
     @Test
-    void clinicalNoteRecorder() throws Exception {
+    void clinicalNoteRecorderIsTheChosenStaff() throws Exception {
         CareService service = mock(CareService.class);
-        send(new CareController(service, resolver), post("/api/emergency/care/records"),
-                "{\"encounterId\":\"r1\",\"noteTypeCode\":\"01\",\"content\":\"x\",\"recordedById\":\"spoofed\"}", true);
+        send(new CareController(service, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/records"),
+                "{\"encounterId\":\"r1\",\"noteTypeCode\":\"01\",\"content\":\"x\",\"recordedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<ClinicalNoteCreateRequestDto> captor = ArgumentCaptor.forClass(ClinicalNoteCreateRequestDto.class);
         verify(service).createRecord(captor.capture());
-        assertThat(captor.getValue().getRecordedById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getRecordedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
     void treatmentPerformerIsTheChosenStaff() throws Exception {
         CareService service = mock(CareService.class);
-        send(new CareController(service, resolver), post("/api/emergency/care/treatments"),
+        send(new CareController(service, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/treatments"),
                 "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"treatmentCode\":\"01\",\"performedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<TreatmentCreateRequestDto> captor = ArgumentCaptor.forClass(TreatmentCreateRequestDto.class);
@@ -104,7 +104,7 @@ class ActorStampingTest {
     @Test
     void medicationAdministratorIsTheChosenStaff() throws Exception {
         CareService service = mock(CareService.class);
-        send(new CareController(service, resolver), post("/api/emergency/care/medication-administrations"),
+        send(new CareController(service, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/medication-administrations"),
                 "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"drugCode\":\"d\",\"administeredById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<MarCreateRequestDto> captor = ArgumentCaptor.forClass(MarCreateRequestDto.class);
@@ -113,42 +113,42 @@ class ActorStampingTest {
     }
 
     @Test
-    void everyCprEventRecorder() throws Exception {
+    void cprEventRecorderIsTheChosenStaffOrTheLoggedInUserWhenBlank() throws Exception {
         CareService service = mock(CareService.class);
-        send(new CareController(service, resolver), post("/api/emergency/care/cpr-timelines"),
-                "{\"encounterId\":\"r1\",\"events\":[{\"eventTypeCode\":\"01\",\"recordedById\":\"a\"},{\"eventTypeCode\":\"02\"}]}", true);
+        send(new CareController(service, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/cpr-timelines"),
+                "{\"encounterId\":\"r1\",\"events\":[{\"eventTypeCode\":\"01\",\"recordedById\":\"EMP-OTHER\"},{\"eventTypeCode\":\"02\"}]}", true);
 
         ArgumentCaptor<CprTimelineCreateRequestDto> captor = ArgumentCaptor.forClass(CprTimelineCreateRequestDto.class);
         verify(service).createCprTimeline(captor.capture());
         assertThat(captor.getValue().getEvents()).extracting(CprTimelineCreateRequestDto.CprEventItemDto::getRecordedById)
-                .containsExactly("EMP-ME", "EMP-ME");
+                .containsExactly("EMP-OTHER", "EMP-ME");
     }
 
     @Test
-    void consentRecorder() throws Exception {
+    void consentRecorderIsTheChosenStaff() throws Exception {
         ConsentService service = mock(ConsentService.class);
         send(new ConsentController(service, resolver), post("/api/emergency/care/consents"),
-                "{\"encounterId\":\"r1\",\"recordedById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"recordedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<ConsentRecordCreateRequestDto> captor = ArgumentCaptor.forClass(ConsentRecordCreateRequestDto.class);
         verify(service).createConsent(captor.capture());
-        assertThat(captor.getValue().getRecordedById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getRecordedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
-    void ktasAssessorOnCreateAndReassess() throws Exception {
+    void ktasAssessorIsTheChosenStaffOnCreateAndReassess() throws Exception {
         TriageService service = mock(TriageService.class);
         send(new TriageController(service, resolver), post("/api/emergency/triage/ktas"),
-                "{\"encounterId\":\"r1\",\"ktasScore\":\"01\",\"assessedById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"ktasScore\":\"01\",\"assessedById\":\"EMP-OTHER\"}", true);
         send(new TriageController(service, resolver), put("/api/emergency/triage/ktas/k1"),
-                "{\"ktasScore\":\"02\",\"assessedById\":\"spoofed\"}", true);
+                "{\"ktasScore\":\"02\",\"assessedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<KtasCreateRequestDto> created = ArgumentCaptor.forClass(KtasCreateRequestDto.class);
         verify(service).createKtas(created.capture());
-        assertThat(created.getValue().getAssessedById()).isEqualTo("EMP-ME");
+        assertThat(created.getValue().getAssessedById()).isEqualTo("EMP-OTHER");
         ArgumentCaptor<KtasUpdateRequestDto> updated = ArgumentCaptor.forClass(KtasUpdateRequestDto.class);
         verify(service).updateKtas(eq("k1"), updated.capture());
-        assertThat(updated.getValue().getAssessedById()).isEqualTo("EMP-ME");
+        assertThat(updated.getValue().getAssessedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
@@ -174,41 +174,75 @@ class ActorStampingTest {
     }
 
     @Test
-    void bedAssignerAndReleaser() throws Exception {
+    void bedAssignerAndReleaserAreTheChosenStaff() throws Exception {
         ResourceService service = mock(ResourceService.class);
         send(new ResourceController(service, resolver), post("/api/emergency/resources/bed-assignments"),
-                "{\"encounterId\":\"r1\",\"bedId\":\"b1\",\"assignedById\":\"spoofed\"}", true);
+                "{\"encounterId\":\"r1\",\"bedId\":\"b1\",\"assignedById\":\"EMP-OTHER\"}", true);
         send(new ResourceController(service, resolver), patch("/api/emergency/resources/bed-assignments/a1/release"),
-                "{\"releasedById\":\"spoofed\"}", true);
+                "{\"releasedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<BedAssignmentCreateRequestDto> assigned = ArgumentCaptor.forClass(BedAssignmentCreateRequestDto.class);
         verify(service).assignBed(assigned.capture());
-        assertThat(assigned.getValue().getAssignedById()).isEqualTo("EMP-ME");
+        assertThat(assigned.getValue().getAssignedById()).isEqualTo("EMP-OTHER");
         ArgumentCaptor<BedReleaseRequestDto> released = ArgumentCaptor.forClass(BedReleaseRequestDto.class);
         verify(service).releaseBed(eq("a1"), released.capture());
-        assertThat(released.getValue().getReleasedById()).isEqualTo("EMP-ME");
+        assertThat(released.getValue().getReleasedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
-    void longStayAlertAcknowledger() throws Exception {
+    void longStayAlertAcknowledgerIsTheChosenStaff() throws Exception {
         MonitorService service = mock(MonitorService.class);
         send(new MonitorController(service, resolver), patch("/api/emergency/monitor/long-stay-alerts/l1/acknowledge"),
-                "{\"acknowledgedById\":\"spoofed\"}", true);
+                "{\"acknowledgedById\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<LosAlertAcknowledgeRequestDto> captor = ArgumentCaptor.forClass(LosAlertAcknowledgeRequestDto.class);
         verify(service).acknowledgeLongStayAlert(eq("l1"), captor.capture());
-        assertThat(captor.getValue().getAcknowledgedById()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getAcknowledgedById()).isEqualTo("EMP-OTHER");
     }
 
     @Test
-    void orderCanceller() throws Exception {
+    void orderCancellerIsTheChosenStaff() throws Exception {
         OrderService service = mock(OrderService.class);
         send(new OrderController(service, resolver), patch("/api/emergency/orders/o1/cancel"),
-                "{\"cancelReason\":\"wrong\",\"userId\":\"spoofed\"}", true);
+                "{\"cancelReason\":\"wrong\",\"userId\":\"EMP-OTHER\"}", true);
 
         ArgumentCaptor<OrderCancelRequestDto> captor = ArgumentCaptor.forClass(OrderCancelRequestDto.class);
         verify(service).cancelOrder(eq("o1"), captor.capture());
-        assertThat(captor.getValue().getUserId()).isEqualTo("EMP-ME");
+        assertThat(captor.getValue().getUserId()).isEqualTo("EMP-OTHER");
+    }
+
+    @Test
+    void aBlankActorIsFilledWithTheLoggedInUser() throws Exception {
+        CareService care = mock(CareService.class);
+        send(new CareController(care, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/records"),
+                "{\"encounterId\":\"r1\",\"noteTypeCode\":\"01\",\"content\":\"x\"}", true);
+        send(new CareController(care, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/treatments"),
+                "{\"encounterId\":\"r1\",\"orderId\":\"o1\",\"treatmentCode\":\"01\"}", true);
+        ArgumentCaptor<ClinicalNoteCreateRequestDto> note = ArgumentCaptor.forClass(ClinicalNoteCreateRequestDto.class);
+        verify(care).createRecord(note.capture());
+        assertThat(note.getValue().getRecordedById()).isEqualTo("EMP-ME");
+        ArgumentCaptor<TreatmentCreateRequestDto> treatment = ArgumentCaptor.forClass(TreatmentCreateRequestDto.class);
+        verify(care).createTreatment(treatment.capture());
+        assertThat(treatment.getValue().getPerformedById()).isEqualTo("EMP-ME");
+
+        TriageService triage = mock(TriageService.class);
+        send(new TriageController(triage, resolver), post("/api/emergency/triage/vital-assessments"),
+                "{\"encounterId\":\"r1\",\"vitals\":[{\"heartRate\":80}]}", true);
+        ArgumentCaptor<VitalAssessmentCreateRequestDto> vitals = ArgumentCaptor.forClass(VitalAssessmentCreateRequestDto.class);
+        verify(triage).createVitalAssessments(vitals.capture());
+        assertThat(vitals.getValue().getMeasuredById()).isEqualTo("EMP-ME");
+
+        ResourceService resource = mock(ResourceService.class);
+        send(new ResourceController(resource, resolver), patch("/api/emergency/resources/bed-assignments/a1/release"), "{}", true);
+        ArgumentCaptor<BedReleaseRequestDto> released = ArgumentCaptor.forClass(BedReleaseRequestDto.class);
+        verify(resource).releaseBed(eq("a1"), released.capture());
+        assertThat(released.getValue().getReleasedById()).isEqualTo("EMP-ME");
+
+        OrderService orders = mock(OrderService.class);
+        send(new OrderController(orders, resolver), patch("/api/emergency/orders/o1/cancel"), "{\"cancelReason\":\"wrong\"}", true);
+        ArgumentCaptor<OrderCancelRequestDto> cancelled = ArgumentCaptor.forClass(OrderCancelRequestDto.class);
+        verify(orders).cancelOrder(eq("o1"), cancelled.capture());
+        assertThat(cancelled.getValue().getUserId()).isEqualTo("EMP-ME");
     }
 
     // ---------------------------------------------------------------- 의사를 골라 보내는 칸은 그대로
@@ -253,7 +287,7 @@ class ActorStampingTest {
     @Test
     void withoutALoginTheTypedValueIsKept() throws Exception {
         CareService service = mock(CareService.class);
-        send(new CareController(service, resolver), post("/api/emergency/care/records"),
+        send(new CareController(service, resolver, org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService.class)), post("/api/emergency/care/records"),
                 "{\"encounterId\":\"r1\",\"noteTypeCode\":\"01\",\"content\":\"x\",\"recordedById\":\"typed-id\"}", false);
 
         ArgumentCaptor<ClinicalNoteCreateRequestDto> captor = ArgumentCaptor.forClass(ClinicalNoteCreateRequestDto.class);

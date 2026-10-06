@@ -9,9 +9,7 @@ import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
-import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreLabItem;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
-import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
@@ -78,17 +76,13 @@ class OrderServiceImplTest {
     }
 
     private OrderServiceImpl newService(boolean forwardVerbalYn) {
-        return newService(forwardVerbalYn, 10);
+        return newService(forwardVerbalYn, true);
     }
 
-    private OrderServiceImpl newService(boolean forwardVerbalYn, long labItemCacheMinutes) {
-        return newService(forwardVerbalYn, labItemCacheMinutes, true);
-    }
-
-    private OrderServiceImpl newService(boolean forwardVerbalYn, long labItemCacheMinutes, boolean pharmacyEnabled) {
+    private OrderServiceImpl newService(boolean forwardVerbalYn, boolean pharmacyEnabled) {
         CommonCodeCache cache = new CommonCodeCache();
         return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress,
-                "10", forwardVerbalYn, labItemCacheMinutes, pharmacyEnabled);
+                "10", forwardVerbalYn, pharmacyEnabled);
     }
 
     private OrderItemDto lab() {
@@ -264,23 +258,6 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void labItemSearchPassesTheContractFieldsThrough() {
-        OrderCoreLabItem cbc = new OrderCoreLabItem();
-        cbc.setItemCode("LAB001");
-        cbc.setItemName("CBC");
-        cbc.setTestClassification("GENERAL");
-        cbc.setSpecimenTypes(List.of("BLOOD"));
-        when(client.searchLabItems(null)).thenReturn(List.of(cbc));
-
-        List<LabItemDto> items = service.searchLabItems("cb");
-
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).getItemCode()).isEqualTo("LAB001");
-        assertThat(items.get(0).getTestClassification()).isEqualTo("GENERAL");
-        assertThat(items.get(0).getSpecimenTypes()).containsExactly("BLOOD");
-    }
-
-    @Test
     void dispatchNowSendsLabAndPharmacyOnlyForTheItemTypesPresent() {
         OrderCreateRequestDto labOnly = request(lab());
         labOnly.setDispatchNow(true);
@@ -427,47 +404,6 @@ class OrderServiceImplTest {
         assertThat(dto.getPharmacyDispatchStatus()).isEqualTo("SENT");
     }
 
-    private OrderCoreLabItem labItem(String code, String name) {
-        OrderCoreLabItem item = new OrderCoreLabItem();
-        item.setItemCode(code);
-        item.setItemName(name);
-        item.setTestClassification("GENERAL");
-        item.setSpecimenTypes(List.of("BLOOD"));
-        return item;
-    }
-
-    @Test
-    void labItemListIsFetchedOnceAndFilteredHereWhileTheCacheIsFresh() {
-        when(client.searchLabItems(null)).thenReturn(List.of(labItem("01", "Blood Glucose Test"), labItem("02", "CBC")));
-
-        assertThat(service.searchLabItems(null)).hasSize(2);
-        assertThat(service.searchLabItems("cbc")).extracting(LabItemDto::getItemCode).containsExactly("02");
-        assertThat(service.searchLabItems("01")).extracting(LabItemDto::getItemName).containsExactly("Blood Glucose Test");
-        assertThat(service.searchLabItems("zzz")).isEmpty();
-
-        verify(client, org.mockito.Mockito.times(1)).searchLabItems(null);     // 처방코어에는 한 번만 물었다
-    }
-
-    @Test
-    void aStaleLabItemListAnswersWhenTheOrderCoreCannotReachTheLab() {
-        OrderServiceImpl alwaysAsk = newService(false, 0);                       // 캐시를 쓰지 않고 매번 처방코어에 묻는 설정
-        when(client.searchLabItems(null))
-                .thenReturn(List.of(labItem("02", "CBC")))
-                .thenThrow(new ExternalServiceException("order core error (search lab items): Failed to search lab items."));
-
-        assertThat(alwaysAsk.searchLabItems(null)).hasSize(1);                   // 처음엔 정상
-        assertThat(alwaysAsk.searchLabItems("cbc")).extracting(LabItemDto::getItemCode)   // LAB 연결이 끊긴 순간에도 받아 둔 목록으로 응답
-                .containsExactly("02");
-        verify(client, org.mockito.Mockito.times(2)).searchLabItems(null);
-    }
-
-    @Test
-    void theErrorIsPassedOnWhenThereIsNoListToFallBackOn() {
-        when(client.searchLabItems(null)).thenThrow(new ExternalServiceException("order core is not reachable"));
-
-        assertThatThrownBy(() -> service.searchLabItems(null)).isInstanceOf(ExternalServiceException.class);
-    }
-
     @Test
     void aLabItemTheLabAlreadyReceivedCountsAsSentEvenWhenTheOrderCoreMarkedItFailed() {
         // 같은 처방을 다시 전송하면 LAB 이 "이미 접수된 오더"로 거절하고 처방코어가 항목을 FAILED 로 덮어쓴다
@@ -496,7 +432,7 @@ class OrderServiceImplTest {
     @Test
     void withPharmacyDisabledADrugOrderIsNeverSentToPharmacy() {
         // 약제 서비스가 없는 배포 — 처방코어는 전송하면 SENT 로 표시하지만 받는 곳이 없다
-        OrderServiceImpl noPharmacy = newService(false, 10, false);
+        OrderServiceImpl noPharmacy = newService(false, false);
         OrderCreateRequestDto both = request(lab(), drug());
         both.setDispatchNow(true);
 
@@ -510,7 +446,7 @@ class OrderServiceImplTest {
 
     @Test
     void withPharmacyDisabledTheDispatchEndpointRefusesInsteadOfCallingTheOrderCore() {
-        OrderServiceImpl noPharmacy = newService(false, 10, false);
+        OrderServiceImpl noPharmacy = newService(false, false);
 
         assertThatThrownBy(() -> noPharmacy.dispatchPharmacy(ORDER_ID))
                 .isInstanceOf(kr.co.seoulit.his.emergencyservice.common.exception.ConflictException.class)

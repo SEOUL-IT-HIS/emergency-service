@@ -109,13 +109,15 @@ class LoginUserResolverTest {
     }
 
     @Test
-    void theLoggedInUserReplacesWhateverTheRequestClaims() {
+    void aChosenStaffIsKeptAndABlankOneFallsBackToTheLoggedInUser() {
+        // 공용 PC라 로그인한 사람과 실제로 한 사람이 다를 수 있다 — 고른 직원을 그대로 쓰고, 비었을 때만 로그인한 사람으로 채운다
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(requestWithSession("loginUser", user("EMP-ME"))));
 
-        assertThat(resolver.actorOr("someone-else")).isEqualTo("EMP-ME");
-        assertThat(resolver.actorOr("  ")).isEqualTo("EMP-ME");
-        assertThat(resolver.actorOr(null)).isEqualTo("EMP-ME");
-        assertThat(resolver.actorOr("EMP-ME")).isEqualTo("EMP-ME");
+        assertThat(resolver.chosenOrLogin("someone-else")).isEqualTo("someone-else");
+        assertThat(resolver.chosenOrLogin("  padded  ")).isEqualTo("padded");
+        assertThat(resolver.chosenOrLogin("  ")).isEqualTo("EMP-ME");
+        assertThat(resolver.chosenOrLogin(null)).isEqualTo("EMP-ME");
+        assertThat(resolver.chosenOrLogin("EMP-ME")).isEqualTo("EMP-ME");
     }
 
     @Test
@@ -123,14 +125,14 @@ class LoginUserResolverTest {
         // 로그인 정보를 읽을 수 없는 환경(단독 실행 등)
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
-        assertThat(resolver.actorOr("typed-id")).isEqualTo("typed-id");
-        assertThat(resolver.actorOr(null)).isNull();
+        assertThat(resolver.chosenOrLogin("typed-id")).isEqualTo("typed-id");
+        assertThat(resolver.chosenOrLogin(null)).isNull();
     }
 
     @Test
     void outsideAnHttpRequestTheRequestValueIsKept() {
         // Kafka 리스너·스케줄러 등 요청 밖
         assertThat(resolver.current()).isEmpty();
-        assertThat(resolver.actorOr("SYSTEM")).isEqualTo("SYSTEM");
+        assertThat(resolver.chosenOrLogin("SYSTEM")).isEqualTo("SYSTEM");
     }
 }

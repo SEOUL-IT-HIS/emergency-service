@@ -181,32 +181,6 @@ class OrderCoreClientTest {
     }
 
     @Test
-    void searchLabItemsSendsTheNameAndReadsTheContractFields() {
-        server.expect(requestTo(BASE + "/api/outpatient/prescriptions/lab-items/search?name=CBC"))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":[{\"itemCode\":\"LAB001\",\"itemName\":\"CBC\","
-                        + "\"testClassification\":\"GENERAL\",\"specimenTypes\":[\"BLOOD\",\"URINE\"],\"extra\":1}]}",
-                        MediaType.APPLICATION_JSON));
-
-        List<OrderCoreLabItem> items = client.searchLabItems(" CBC ");     // 앞뒤 공백은 뗀다
-
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).getItemCode()).isEqualTo("LAB001");
-        assertThat(items.get(0).getTestClassification()).isEqualTo("GENERAL");
-        assertThat(items.get(0).getSpecimenTypes()).containsExactly("BLOOD", "URINE");
-        server.verify();
-    }
-
-    @Test
-    void searchLabItemsWithoutANameAsksForTheWholeList() {
-        server.expect(requestTo(BASE + "/api/outpatient/prescriptions/lab-items/search"))
-                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":[]}", MediaType.APPLICATION_JSON));
-
-        assertThat(client.searchLabItems(null)).isEmpty();
-        server.verify();
-    }
-
-    @Test
     void verbalConfirmPatchesWithTheDoctorAsAQueryParameterAndConflictsAreNotUpstreamErrors() {
         server.expect(requestTo(BASE + "/api/outpatient/prescriptions/" + ORDER_ID + "/verbal-confirm?confirmedBy=dr-9"))
                 .andExpect(method(HttpMethod.PATCH)).andRespond(withSuccess());

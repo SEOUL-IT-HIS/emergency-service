@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface DispositionRepository extends JpaRepository<Disposition, String> {
+    boolean existsByReceptionId(String receptionId);
+
 
     List<Disposition> findByReceptionIdIn(java.util.Collection<String> receptionIds);
 

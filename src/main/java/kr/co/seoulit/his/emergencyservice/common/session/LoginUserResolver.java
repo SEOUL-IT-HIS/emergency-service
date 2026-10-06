@@ -55,19 +55,23 @@ public class LoginUserResolver {
     }
 
     /**
-     * 기록할 처리자 ID. 로그인한 사용자가 있으면 그 사람의 empId 다 — 요청에 실린 값은 화면이 보낸 것이라
-     * 바꿔 보낼 수 있으므로 무시한다. 로그인 정보를 읽을 수 없는 환경(단독 실행 등)에서만 요청값을 그대로 쓴다.
+     * 기록할 처리자 ID. 화면에서 고른 직원이 있으면 그 직원이고, 비어 있으면 로그인한 사용자다.
+     * 병원에서는 PC를 여럿이 같이 쓰고 그때마다 로그아웃하지 않아서, 로그인한 사람과 실제로 한 사람이 다를 수 있다.
+     * 그래서 고른 값을 그대로 쓰고(로그인한 사람으로 덮어쓰지 않는다), 로그인한 사람과 다르면 누가 대신 입력했는지 서버 로그에 남긴다.
+     * 로그인 정보를 읽을 수 없는 환경(단독 실행 등)에서는 요청값을 그대로 쓴다.
      */
-    public String actorOr(String requested) {
+    public String chosenOrLogin(String requested) {
         Optional<SessionUser> user = current();
-        if (user.isEmpty()) {
-            return requested;
+        if (StringUtils.hasText(requested)) {
+            String chosen = requested.trim();
+            user.ifPresent(login -> {
+                if (!chosen.equals(login.getEmpId())) {
+                    log.info("대리 입력 - 로그인={}, 선택한 처리자={}", login.getEmpId(), chosen);
+                }
+            });
+            return chosen;
         }
-        String empId = user.get().getEmpId();
-        if (StringUtils.hasText(requested) && !requested.trim().equals(empId)) {
-            log.info("처리자 ID를 로그인 사용자로 대체 - 요청={}, 로그인={}", requested.trim(), empId);
-        }
-        return empId;
+        return user.map(SessionUser::getEmpId).orElse(requested);
     }
 
     private SessionUser read(HttpServletRequest request) {

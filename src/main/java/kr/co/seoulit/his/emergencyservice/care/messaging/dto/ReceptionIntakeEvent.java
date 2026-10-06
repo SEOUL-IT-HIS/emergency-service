@@ -19,4 +19,18 @@ public class ReceptionIntakeEvent {
     private LocalDateTime receivedAt;
     private String memo;
     private String chiefComplaintRaw;
+    // 접수에서 입력한 KTAS 등급·분류 시각(선택)
+    @com.fasterxml.jackson.annotation.JsonAlias({"ktasLevelCode", "ktasScore", "ktas"})
+    private String ktasLevel;
+    private LocalDateTime triageDateTime;
+
+    // 취소 이벤트 구분(등록 이벤트에는 없음) - eventType "ReceptionCancelled", status "CANCELLED"
+    public static final String TYPE_CANCELLED = "ReceptionCancelled";
+    private String eventType;
+    private String status;
+
+    /** 접수 취소 이벤트인지 - eventType 이 없으면 등록이다 */
+    public boolean isCancellation() {
+        return eventType != null && TYPE_CANCELLED.equalsIgnoreCase(eventType.trim());
+    }
 }

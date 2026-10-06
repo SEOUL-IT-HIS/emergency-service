@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.care.dto.*;
 import kr.co.seoulit.his.emergencyservice.care.entity.*;
 import kr.co.seoulit.his.emergencyservice.care.mapper.CareMapstructMapper;
 import kr.co.seoulit.his.emergencyservice.care.repository.*;
+import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.util.InChunks;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
@@ -53,6 +54,8 @@ public class CareServiceImpl implements CareService {
     /** 목록 상태(저장하는 코드가 아니라 화면 필터용 계산값): 진료 중 / 퇴실 처리 완료 */
     public static final String CARE_STATUS_IN_CARE = "IN_CARE";
     public static final String CARE_STATUS_DONE = "DONE";
+    /** 접수에서 취소한 접수(CANCELLED_AT 이 있는 접수) */
+    public static final String CARE_STATUS_CANCELLED = "CANCELLED";
 
     @Override
     @Transactional(readOnly = true)
@@ -135,6 +138,9 @@ public class CareServiceImpl implements CareService {
     }
 
     private static String careStatus(ReceptionIntake intake, Set<String> doneReceptionIds) {
+        if (intake.isCancelled()) {
+            return CARE_STATUS_CANCELLED;
+        }
         return doneReceptionIds.contains(intake.getId()) ? CARE_STATUS_DONE : CARE_STATUS_IN_CARE;
     }
 
@@ -352,6 +358,7 @@ public class CareServiceImpl implements CareService {
     private List<ReceptionIntake> activeReceptionsOf(String patientId, int windowHours) {
         LocalDateTime since = LocalDateTime.now().minusHours(windowHours);
         List<ReceptionIntake> intakes = receptionIntakeRepository.findByPatientId(patientId).stream()
+                .filter(intake -> !intake.isCancelled())
                 .filter(intake -> intake.getReceivedAt() == null || !intake.getReceivedAt().isBefore(since))
                 .toList();
         Set<String> done = dischargeProgress.doneReceptionIds(intakes.stream().map(ReceptionIntake::getId).toList());
@@ -381,6 +388,10 @@ public class CareServiceImpl implements CareService {
         ReceptionIntake intake = receptionIntakeRepository.findById(request.getReceptionId())
                 .orElseGet(ReceptionIntake::new);
         boolean isNew = intake.getId() == null;
+        if (intake.isCancelled()) {
+            // 취소된 접수를 등록 이벤트가 다시 살리지 않는다
+            throw new ConflictException("reception already cancelled: " + request.getReceptionId());
+        }
 
         intake.setId(request.getReceptionId());
         intake.setPatientId(request.getPatientId());
@@ -394,6 +405,7 @@ public class CareServiceImpl implements CareService {
         }
 
         ReceptionIntake saved = receptionIntakeRepository.save(intake);
+        recordKtasFromReception(saved, request);
 
         if (isNew) {
             // 접수는 거절하지 않고 항상 저장한다(응급 환자를 못 받는 상황이 생기면 안 된다). 같은 환자의 진행 중 접수가 있으면 경고만 남긴다.
@@ -413,6 +425,42 @@ public class CareServiceImpl implements CareService {
         dto.setMemo(saved.getMemo());
         dto.setChiefComplaintRaw(saved.getChiefComplaintRaw());
         return dto;
+    }
+
+    /** 접수가 입력한 KTAS 의 분류자 표시(접수 서비스가 한 분류라 직원 ID 가 없다) */
+    static final String RECEPTION_ASSESSOR = "RECEPTION";
+
+    /**
+     * 접수에서 KTAS 등급을 같이 주면 최초(INITIAL) 분류로 저장한다 — 응급 목록에 접수 때 정한 등급이 바로 보이게.
+     * 이미 최초 분류가 있으면(응급이 먼저 입력했거나 접수 이벤트를 다시 받은 경우) 건드리지 않는다.
+     * 등급이 이상해도 접수 자체는 거절하지 않고 경고만 남긴다(응급 환자를 못 받는 상황이 생기면 안 된다).
+     */
+    private void recordKtasFromReception(ReceptionIntake saved, ReceptionIntakeCreateRequestDto request) {
+        if (!StringUtils.hasText(request.getKtasLevel())) {
+            return;
+        }
+        String level = request.getKtasLevel().trim();
+        if (level.length() == 1 && Character.isDigit(level.charAt(0))) {
+            level = "0" + level;                                   // 1 -> 01 (admin TRIAGE_CD 는 두 자리 코드)
+        }
+        if (!codeResolver.valueSet(EmgCodes.KTAS_LEVEL_GROUP, EmgCodes.KTAS_LEVEL_FALLBACK).contains(level)) {
+            log.warn("접수의 KTAS 등급을 저장하지 못함 - 알 수 없는 값: receptionId={}, ktasLevel={}", saved.getId(), request.getKtasLevel());
+            return;
+        }
+        if (triageAssessmentRepository.existsByReceptionIdAndAssessmentTypeCode(saved.getId(), EmgCodes.ASSESSMENT_INITIAL)) {
+            return;
+        }
+        TriageAssessment assessment = new TriageAssessment();
+        assessment.setReceptionId(saved.getId());
+        assessment.setKtasLevelCode(level);
+        assessment.setAssessmentTypeCode(EmgCodes.ASSESSMENT_INITIAL);
+        assessment.setAssessedById(RECEPTION_ASSESSOR);
+        assessment.setAssessedAt(request.getTriageDateTime() != null ? request.getTriageDateTime() : saved.getReceivedAt());
+        assessment.setReason("Entered at reception");
+        assessment.setCreatedAt(LocalDateTime.now());
+        assessment.setUpdatedAt(LocalDateTime.now());
+        triageAssessmentRepository.save(assessment);
+        log.info("접수의 KTAS 등급 저장 - receptionId={}, level={}", saved.getId(), level);
     }
 
     /**

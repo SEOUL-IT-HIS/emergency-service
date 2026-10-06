@@ -21,19 +21,21 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 로그인은 admin이 처리한다. admin이 Redis에 세션(`SessionUser`: empId, empName …)을 저장하고 브라우저에 `SESSION` 쿠키를 주면, 응급은 같은 쿠키로 같은 세션을 읽는다(`spring-session-data-redis`). 세션 속성 이름은 몰라도 `SessionUser` 타입으로 찾는다. 세션이 없거나 읽을 수 없으면(로그인 안 함, 만료) "로그인 정보 없음"으로 본다. 참고: Redis가 응답하지 않으면 SESSION 쿠키가 있는 요청은 Spring MVC가 요청 맨 앞에서 세션을 읽다가 500이 난다 — 응급 코드 이전의 프레임워크 동작이라 응급만의 문제가 아니며, Redis가 살아 있는 서버에서는 해당 없다.
 
-**처리자 ID는 화면이 보낸 값이 아니라 세션의 empId로 기록한다.** 요청에 실린 값은 바꿔 보낼 수 있어서, 세션이 있으면 요청값을 무시하고 로그인 사용자로 덮어쓴다(다르면 서버 로그에 남긴다). 세션이 없는 환경(단독 실행 등)에서만 요청값을 그대로 쓴다.
+**처리자 ID는 화면에서 고른 직원이고, 비어 있으면 세션의 empId(로그인한 사용자)로 채운다.** 병원에서는 PC를 여럿이 같이 쓰고 그때마다 로그아웃하지 않아서, 로그인한 사람과 실제로 기록·시행한 사람이 다를 수 있다. 그래서 로그인 계정으로 덮어쓰지 않는다. 대신 고른 직원이 로그인한 사용자와 다르면 서버 로그에 `대리 입력 - 로그인=…, 선택한 처리자=…`로 남긴다(별도 컬럼은 없다). 로그인 정보를 읽을 수 없는 환경(단독 실행 등)에서는 요청값을 그대로 쓴다.
 
-| 로그인 사용자로 기록(요청값 무시) | 요청값 그대로(화면에서 직원을 골라 보냄) |
+| 구분 | 칸 |
 | --- | --- |
-| 진료기록 `recordedById`, 동의 `recordedById`, CPR 이벤트 `recordedById`, KTAS `assessedById`(분류·재평가), 병상 `assignedById`·`releasedById`, 장기체류 경고 `acknowledgedById`, 처방 취소 `userId` | **의사를 지정**: 처방 `prescribedBy`, 구두처방 확정 `confirmedBy`, 퇴실 결정 `decidedById`, 격리 결정 `decidedById`, 전원소견서 `writtenById`<br>**실제로 행위를 한 사람**(기본은 로그인한 사람, 다른 의사·간호사를 고를 수 있음): 처치 `performedById`, 투약 `administeredById`, 활력징후 `measuredById`, 위험 스크리닝 `screenedById` |
+| **직원을 고름**(의사·간호사, 기본은 로그인한 사람, 비우면 로그인한 사용자로 채움) | 진료기록 `recordedById`, 동의 `recordedById`, CPR 이벤트 `recordedById`, KTAS `assessedById`(분류·재평가), 처치 `performedById`, 투약 `administeredById`, 활력징후 `measuredById`, 위험 스크리닝 `screenedById`, 병상 `assignedById`·`releasedById`, 장기체류 경고 `acknowledgedById`, 처방 취소 `userId` |
+| **의사를 지정**(기본은 로그인한 사람이 의사일 때 그 사람, 비워 두지 않는다) | 처방 `prescribedBy`, 구두처방 확정 `confirmedBy`, 퇴실 결정 `decidedById`, 격리 결정 `decidedById`, 전원소견서 `writtenById` |
 
-의사 칸은 로그인한 사람이 아니라 선택한 의사(구두처방은 간호사가 의사 대신 입력)라서 요청값을 쓴다. 처치·투약·활력징후·스크리닝은 의사가 시술하고 간호사가 기록하거나 한 간호사가 투여하고 다른 간호사가 기록하는 경우가 있어 실제로 행위를 한 직원을 고르게 하고, 기록 책임(진료기록·동의·CPR·KTAS 등)은 로그인한 사람으로 고정한다. 의사·간호사 목록은 admin 직원의 부서(`DEPT_CD`)별로 묶어 응급의학과(10)를 맨 위에 보여주되 다른 과도 막지 않는다(협진·당직). 서버가 그 값이 실제 의사인지는 확인하지 않는다(admin 직원 조회가 사용자 세션을 요구한다 — 이후 단계).
+의사 칸은 입력하는 사람(간호사)과 결정하는 의사가 다른 경우가 일반적이라 의사를 고르게 한다. 서버가 선택한 값이 실제 의사·간호사인지는 확인하지 않는다(admin 직원 조회가 사용자 세션을 요구한다 — 이후 단계). 의사·간호사 목록은 admin 직원의 부서(`DEPT_CD`)별로 묶어 응급의학과(10)를 맨 위에 보여주되 다른 과도 막지 않는다(협진·당직). 사번은 같은 이름이 둘 이상일 때만 화면에 보여준다.
 
-**로그인 검사(`app.auth.required`, 환경변수 `AUTH_REQUIRED`, 기본 `false`)**: `true`면 `/api/emergency/**`를 로그인 없이 부를 때 **401** `EMG_UNAUTHENTICATED`를 준다. 아래 두 API는 접수 서비스가 서버끼리 부르는 것이라 쿠키가 없으므로 제외한다(CORS 사전 요청 `OPTIONS`도 통과).
+**로그인 검사(`app.auth.required`, 환경변수 `AUTH_REQUIRED`, 기본 `false`)**: `true`면 `/api/emergency/**`를 로그인 없이 부를 때 **401** `EMG_UNAUTHENTICATED`를 준다. 아래 API는 접수 서비스가 서버끼리 부르는 것이라 쿠키가 없으므로 제외한다(CORS 사전 요청 `OPTIONS`도 통과).
 
 | 제외 API | 호출처 |
 | --- | --- |
 | `GET /api/emergency/care/patients/active` | 접수 — 중복 접수 확인 |
+| `GET /api/emergency/care/reception-intakes/cancellable` | 접수 — 접수 취소 전 취소 가능 여부 확인 |
 | `POST /api/emergency/care/reception-intakes` | 접수 — 접수 정보 REST 전송(정식 경로는 Kafka) |
 
 켜기 전에 admin과 같은 Redis 세션을 읽는 환경에서 **로그인한 브라우저로** 확인한다. 공용 axios가 401을 받으면(로그인 상태였을 때) 로그인 화면으로 보낸다.
@@ -157,7 +159,6 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | --- | --- | --- | --- |
 | POST | `/api/emergency/orders` | `POST /api/outpatient/prescriptions/emergency/{receptionId}` | 검사·약품 처방 등록. 본문 `encounterId`(접수ID), `prescribedBy`, `priorityCode`(ORDER_PRIORITY_CD, STAT=01), `timingCode`(ORDER_TIMING_CD 01/02/03), `items[]`, 선택 `verbalYn`(Y/N), `dispatchNow`. `patientId`·`serviceType="ER"`·`departmentCode="10"`·`orderMethod="01"`은 서버가 채움 |
 | GET | `/api/emergency/orders?encounterId=` | `GET /api/outpatient/prescriptions?receptionId=` | 접수의 처방 목록(최근 처방 먼저). items 없는 가벼운 목록 — 처방ID·상태·`priorityCode`와 전송 상태 요약(`labSendStatus`: 검사 항목 중 하나라도 FAILED면 FAILED, 미전송/PENDING이 있으면 PENDING, 전부 SENT면 SENT, 검사 항목이 없으면 null / `pharmacySendStatus`: 처방 단위 PENDING·SENT·FAILED). 상세·검사결과는 단건 조회 |
-| GET | `/api/emergency/orders/lab-items?name=` | `GET /api/outpatient/prescriptions/lab-items/search?name=` | 검사항목 검색(처방 등록 때 항목 선택). LAB팀 계약 그대로 `itemCode`, `itemName`, `testClassification`(GENERAL/MICROBIOLOGY/PATHOLOGY), `specimenTypes`. `name` 생략 시 전체, 있으면 코드/이름 부분일치 |
 | GET | `/api/emergency/orders/{orderId}` | `GET /api/outpatient/prescriptions/{id}` | 처방 단건 |
 | PATCH | `/api/emergency/orders/{orderId}/verbal-confirm` | `PATCH …/{id}/verbal-confirm?confirmedBy=` | 구두처방 사후 확정(본문 `confirmedBy`=의사 ID, 확정 일시·확정자 기록). 구두처방(`verbalYn=Y`)이 아니거나 이미 확정된 처방은 처방코어가 거절 — 409는 409로, 그 외 4xx는 400으로 전달 |
 | PATCH | `/api/emergency/orders/{orderId}/cancel` | `PATCH …/{id}/deactivate?cancelReason=&userId=` | 취소(삭제 아님). **수정 API는 없음 — 변경은 취소 후 재등록** |
@@ -176,7 +177,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 - **검사 결과는 응급 DB에 저장하지 않고 처방 단건 조회에서 그대로 전달한다.** 항목(`items[]`)에 `resultReportedAt`과 `resultDetails[]`(`detailName`, `resultValue`, `resultUnit`, `referenceRange`, `abnormalFlag` L/H/N)가 온다. 결과는 LAB → 처방코어로 비동기로 도착하므로 화면은 결과가 올 때까지 30초마다(최대 10분) 목록을 다시 불러오고, 그 뒤에는 Refresh로 직접 확인한다. 응급이 LAB 결과 토픽(`lab.lab-result.reported.v1`)을 직접 구독하지는 않는다(결과 본문을 저장하지 않는 규칙상 보여줄 곳이 없다).
 - **결과를 받는 검사는 01~04뿐이다**(01 Blood Glucose, 02 CBC, 03 Liver Function, 04 Urinalysis). 05 Blood Culture, 06 Urine Culture, 07 Histopathology, 08 Cytology(배양·병리)는 받는 결과항목이 없고 처방코어도 반영하지 않는다(전체 MSA 카탈로그 점검 I-04). 화면은 이 검사에 "결과 대기" 대신 안내만 보이고 자동 새로고침 대상에서도 뺀다. **수술·영상 오더는 이번 범위에서 제외**한다.
 - **LAB 거절 사유**: 검사 전송이 `FAILED`일 때 항목의 `rejectReason`을 그대로 전달한다(예: "유효하지 않은 환자ID입니다" = LAB에 없는 환자, "이미 접수된 오더입니다" = 중복 전송). 중복 전송은 처방코어가 항목을 FAILED로 덮어쓰지만 LAB은 이미 받은 상태이므로 `labOrderId`가 있거나 거절 사유가 "이미 접수"이면 전송 완료(SENT)로 계산한다.
-- **검사항목 목록은 응급 서버가 10분간 캐시**한다(`app.order.lab-item-cache-minutes`, 기본 10). 처방코어가 일시적으로 응답하지 못하면 마지막으로 받은 목록을 대신 돌려준다(캐시가 없을 때만 502). 이름·코드 필터는 응급 서버에서 한다.
+- **화면의 검사 선택은 이 API를 부르지 않는다.** 응급 화면은 검사 종류를 admin 공통코드 `TEST_TYPE_CD`(01 혈당, 02 CBC, 03 간기능, 04 요검사, 05 혈액배양, 06 소변배양, 07 조직병리, 08 세포검사)에서 고르고 그 코드값을 처방 항목의 `itemCode`로 보낸다(외래·병동·LAB도 같은 값을 쓴다). 처방코어↔LAB 연결이 끊겨도 검사를 고를 수 있다. 예전의 검사항목 검색 API(`GET /orders/lab-items`)와 10분 캐시(`app.order.lab-item-cache-minutes`)는 없앴다.
 
 ---
 
@@ -223,6 +224,41 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | order.routed | Y | LAB/PHM/SUR 알림 |
 | order.validation.completed | Y | DUR UI |
 | order.acknowledged | 선택 | Q-ACK |
+
+### 6-1. 접수(RCP) 이벤트 — 토픽 `Emergency-patient-daily-list`
+
+접수가 등록 때와 같은 토픽·같은 `receptionId`(키)로 두 종류를 보낸다. `eventType`이 없으면 등록, `"ReceptionCancelled"`면 취소.
+
+| 구분 | eventType | status | 필드 |
+| --- | --- | --- | --- |
+| 등록 | (없음) | (없음) | receptionId, patientId, arrivalPath, receivedAt, memo, chiefComplaintRaw, ktasLevel, triageDateTime |
+| 취소 | `ReceptionCancelled` | `CANCELLED` | 등록과 같은 필드 + eventId(새로), occurredAt(취소 시각) |
+
+- 처음 보는 필드는 무시한다(`JsonDeserializer`가 모르는 필드로 실패하지 않는다).
+- 취소는 접수를 지우지 않고 `RECEPTION_INTAKE.CANCELLED_AT`에 취소 시각(`occurredAt`)을 남긴다. 취소된 접수는 환자 목록(`GET /care/patients`)에서 `status=CANCELLED`로 따로 조회한다(`careStatusCode=CANCELLED`). `IN_CARE`·`DONE` 조회에는 나오지 않고, 상태를 비운 전체 조회에는 나온다. 현황판 재실 환자·장기체류 알림·진행 중 접수 조회(`GET /care/patients/active`)에서는 빠진다. 병상 배정·KTAS·활력징후·격리·위험 스크리닝·처방 등록 같은 새 입력은 409(`reception cancelled`), 같은 접수의 등록 이벤트는 409(`reception already cancelled`)로 거절한다(퇴실 완료 환자와 같은 가드).
+- **진료 기록이 있는 접수는 취소하지 않고 거절한다**(로그 `접수 취소 거절`). 기록 = 진료기록·처치·투약·CPR·동의·직원이 입력한 KTAS·활력징후·격리·위험 스크리닝·EMS 의뢰·병상 배정(해제 이력 포함)·퇴실 결정·처방코어의 처방. 접수가 넣어준 KTAS(`assessedById=RECEPTION`)와 장기체류 자동 알림은 기록으로 보지 않는다. 처방코어에서 처방 여부를 확인하지 못해도 거절한다.
+- Kafka라 거절을 접수에 되돌려 줄 수 없다 — 거절은 응급 서버 로그로만 남는다.
+- 응급에 없는 접수의 취소는 건너뛴다(등록 이벤트를 못 받은 경우). 이미 취소된 접수의 취소가 다시 와도 처음 취소 시각을 유지한다.
+- DB: `scripts/alter-reception-intake-add-cancelled-at.sql` 을 새 코드보다 먼저 실행해야 한다.
+
+**취소 가능 여부 조회** — `GET /api/emergency/care/reception-intakes/cancellable?receptionId={receptionId}` (연계:RCP, 아무것도 바꾸지 않는다)
+
+접수가 취소 버튼을 누르기 전에 미리 물어 화면에서 안내하는 용도다. 응급이 취소 이벤트를 받을 때 쓰는 판단과 같은 기준이다. 조회와 실제 취소 사이에 응급에서 기록이 생길 수 있으므로 **최종 판단은 취소 이벤트를 받을 때 응급이 다시 한다.**
+
+```json
+{ "code": 200, "message": "SUCCESS",
+  "data": { "receptionId": "…", "cancellable": false, "reasonCode": "HAS_RECORDS", "records": ["TREATMENT", "BED_ASSIGNMENT"] } }
+```
+
+| reasonCode | cancellable | 의미 |
+| --- | --- | --- |
+| `CANCELLABLE` | true | 진료 기록 없음 — 취소 이벤트를 받으면 취소한다 |
+| `ALREADY_CANCELLED` | true | 이미 취소된 접수 |
+| `NOT_FOUND` | true | 응급에 없는 접수(응급은 건너뛴다) |
+| `HAS_RECORDS` | false | 진료 기록이 있다 — 취소 이벤트를 받아도 응급은 취소하지 않는다. `records`에 종류 |
+| `CANNOT_VERIFY` | false | 처방코어에서 처방 여부를 확인하지 못했다 — 잠시 뒤 다시 조회 |
+
+`records` 값: `CLINICAL_NOTE`(진료기록) · `TREATMENT`(처치) · `MEDICATION`(투약) · `CPR` · `CONSENT`(동의) · `KTAS`(직원이 입력한 KTAS) · `VITAL_SIGNS`(활력징후) · `ISOLATION`(격리) · `RISK_SCREENING` · `EMS_REFERRAL` · `BED_ASSIGNMENT`(병상 배정, 해제 이력 포함) · `DISPOSITION`(퇴실 결정) · `ORDER`(처방코어 처방). 접수가 넣어준 KTAS는 기록으로 보지 않는다. `receptionId`가 비면 400. 로그인 검사(`app.auth.required`)에서 제외한다(서버끼리 호출).
 
 ---
 
