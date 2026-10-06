@@ -56,6 +56,22 @@ class ReceptionIntakeEventTest {
     }
 
     @Test
+    void 접수가_보내는_KTAS_숫자와_분류시각을_읽는다() {
+        // RCP 는 ktasLevel 을 숫자(1~5)로, triageDateTime 을 날짜 문자열로 보낸다
+        ReceptionIntakeEvent e = read("{" + BASE + ",\"ktasLevel\":2,\"triageDateTime\":\"2026-10-05T09:03:00\"}");
+        assertEquals("2", e.getKtasLevel());
+        assertEquals(java.time.LocalDateTime.of(2026, 10, 5, 9, 3), e.getTriageDateTime());
+    }
+
+    @Test
+    void 취소_이벤트에_같은_KTAS_값이_있어도_읽는다() {
+        ReceptionIntakeEvent e = read("{" + BASE + ",\"ktasLevel\":3,\"triageDateTime\":\"2026-10-05T09:03:00\","
+                + "\"eventType\":\"ReceptionCancelled\",\"status\":\"CANCELLED\"}");
+        assertTrue(e.isCancellation());
+        assertEquals("3", e.getKtasLevel());
+    }
+
+    @Test
     void 처음_보는_필드가_있어도_읽는다() {
         ReceptionIntakeEvent e = read("{" + BASE + ",\"someNewField\":\"x\",\"nested\":{\"a\":1}}");
         assertEquals("r1", e.getReceptionId());
