@@ -38,11 +38,16 @@ public class MonitorServiceImpl implements MonitorService {
     @Value("${app.monitor.los-threshold-minutes:360}")
     private int losThresholdMinutes;
 
+    /** 취소된 접수는 재실 환자·장기체류 알림 대상이 아니다 */
+    private List<ReceptionIntake> activeIntakes() {
+        return receptionIntakeRepository.findAll().stream().filter(intake -> !intake.isCancelled()).toList();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public DashboardDto getDashboard() {
         CongestionMetricDto congestion = resourceService.getCongestion().getTotal();
-        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
+        List<ReceptionIntake> intakes = activeIntakes();
         // 재실 = 퇴실 처리가 끝나지 않은 접수(환자 목록 '진료 중'과 같은 기준). 입원 병상 대기 환자도 재실이다.
         Set<String> done = doneReceptionIds(intakes);
         List<LosAlert> openAlerts = openAlertsOfPatientsInCare(done);
@@ -64,7 +69,7 @@ public class MonitorServiceImpl implements MonitorService {
     @Transactional(readOnly = true)
     public List<LosAlertDto> getLongStayAlerts(Integer thresholdHours) {
         int minutes = thresholdHours != null ? thresholdHours * 60 : 360;
-        Set<String> done = doneReceptionIds(receptionIntakeRepository.findAll());
+        Set<String> done = doneReceptionIds(activeIntakes());
         List<LosAlert> alerts = openAlertsOfPatientsInCare(done).stream()
                 .filter(a -> a.getThresholdMinutes() == null || a.getThresholdMinutes() >= minutes)
                 .toList();
@@ -80,7 +85,7 @@ public class MonitorServiceImpl implements MonitorService {
     public int detectLongStayPatients() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoff = now.minusMinutes(losThresholdMinutes);
-        List<ReceptionIntake> intakes = receptionIntakeRepository.findAll();
+        List<ReceptionIntake> intakes = activeIntakes();
         Set<String> disposed = doneReceptionIds(intakes);
         // 이미 알린 접수는 한 번에 가져와 메모리에서 확인한다(접수마다 exists 조회 = N+1 방지)
         Set<String> alreadyAlerted = new HashSet<>(losAlertRepository.findReceptionIdsByThresholdMinutes(losThresholdMinutes));

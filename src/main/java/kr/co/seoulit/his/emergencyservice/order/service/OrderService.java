@@ -1,9 +1,9 @@
 package kr.co.seoulit.his.emergencyservice.order.service;
 
+import kr.co.seoulit.his.emergencyservice.order.dto.MedicationDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
-import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderVerbalConfirmRequestDto;
 
@@ -15,8 +15,8 @@ public interface OrderService {
 
     OrderDto getOrder(String orderId);
 
-    /** 검사항목 검색(처방 등록 때 항목 선택용). name 이 없으면 전체 */
-    List<LabItemDto> searchLabItems(String name);
+    /** 약품 검색(처방 등록 때 약품 선택용) — 약품명 일부(name)가 필요하다. 결과는 최대 30건 */
+    List<MedicationDto> searchMedications(String name);
 
     /** 구두처방 사후 확정 — 구두처방(verbalYn=Y)만, 이미 확정한 처방은 처방코어가 거절한다 */
     OrderDto confirmVerbalOrder(String orderId, OrderVerbalConfirmRequestDto request);

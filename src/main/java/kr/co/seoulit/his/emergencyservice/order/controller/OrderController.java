@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
-import kr.co.seoulit.his.emergencyservice.order.dto.LabItemDto;
+import kr.co.seoulit.his.emergencyservice.order.dto.MedicationDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
@@ -23,7 +23,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
-    // 취소자는 로그인한 사용자로 기록한다. 처방의(prescribedBy)·구두 확정 의사(confirmedBy)는 화면에서 의사를 골라 보내므로 요청값을 그대로 쓴다.
+    // 취소자는 화면에서 고른 직원이고 비어 있으면 로그인한 사용자로 채운다. 처방의(prescribedBy)·구두 확정 의사(confirmedBy)는 화면에서 의사를 골라 보내므로 요청값을 그대로 쓴다.
     private final LoginUserResolver loginUser;
 
     @Operation(summary = "응급 처방 등록(검사·약품)",
@@ -40,10 +40,10 @@ public class OrderController {
         return ApiResponse.success(orderService.listOrders(encounterId));
     }
 
-    @Operation(summary = "검사항목 검색", description = "처방 등록 때 검사 항목(itemCode·itemName)을 고르는 용도. 처방코어 lab-items/search 호출(LAB팀 계약: itemCode, itemName, testClassification, specimenTypes). name 이 없으면 전체, 있으면 코드/이름 부분일치")
-    @GetMapping("/lab-items")
-    public ApiResponse<List<LabItemDto>> searchLabItems(@RequestParam(required = false) String name) {
-        return ApiResponse.success(orderService.searchLabItems(name));
+    @Operation(summary = "약품 목록", description = "처방 등록 때 약품(itemCode=약품 마스터 ediCode, itemName, dosageFormCd)을 고르는 용도. 약제 medications/page 호출(EDI 코드가 있는 약품만, 이름순). name(약품명 일부)은 선택 — 비우면 전체(최대 500건). 약제가 응답하지 못하면 502")
+    @GetMapping("/medications")
+    public ApiResponse<List<MedicationDto>> searchMedications(@RequestParam(required = false) String name) {
+        return ApiResponse.success(orderService.searchMedications(name));
     }
 
     @Operation(summary = "처방 단건 조회", description = "처방코어 prescriptionId(= orderId) 기준")
@@ -55,7 +55,7 @@ public class OrderController {
     @Operation(summary = "처방 취소", description = "처방코어에는 수정 API가 없다 — 변경은 취소 후 재등록. 삭제가 아니라 상태 변경")
     @PatchMapping("/{orderId}/cancel")
     public ApiResponse<OrderDto> cancelOrder(@PathVariable String orderId, @RequestBody OrderCancelRequestDto request) {
-        request.setUserId(loginUser.actorOr(request.getUserId()));
+        request.setUserId(loginUser.chosenOrLogin(request.getUserId()));
         return ApiResponse.success(orderService.cancelOrder(orderId, request));
     }
 

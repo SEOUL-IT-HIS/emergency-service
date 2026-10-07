@@ -4,6 +4,7 @@ import kr.co.seoulit.his.emergencyservice.common.ApiResponse;
 import kr.co.seoulit.his.emergencyservice.common.session.LoginUserResolver;
 import kr.co.seoulit.his.emergencyservice.care.dto.*;
 import kr.co.seoulit.his.emergencyservice.care.service.CareService;
+import kr.co.seoulit.his.emergencyservice.care.service.ReceptionCancellationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +19,10 @@ import java.util.List;
 public class CareController {
 
     private final CareService careService;
-    // 기록자(진료기록·CPR 이벤트)는 로그인한 사용자로 기록한다 — 요청에 실린 값은 바꿔 보낼 수 있다.
-    // 처치 시행자(performedById)·투약 투여자(administeredById)는 실제로 한 사람이 기록하는 사람과 다를 수 있어
-    // 화면에서 고른 직원(기본은 로그인한 사람)을 요청값 그대로 쓴다.
+    // 기록자·시행자·투여자는 화면에서 고른 직원이고, 비어 있으면 로그인한 사용자로 채운다(공용 PC라 로그인한 사람과 다를 수 있다).
     private final LoginUserResolver loginUser;
+    // 접수 서비스가 취소 전에 묻는 취소 가능 여부 조회
+    private final ReceptionCancellationService receptionCancellationService;
 
     @Operation(summary = "응급환자 목록 조회", description = "UC-CARE-01 · 접수 유입 환자목록 + 초기 임상정보 (연계:RCP)")
     @GetMapping("/patients")
@@ -49,7 +50,7 @@ public class CareController {
     @Operation(summary = "응급 진료기록 입력", description = "UC-CARE-02 · EMR 임상노트")
     @PostMapping("/records")
     public ApiResponse<ClinicalNoteDto> createRecord(@RequestBody ClinicalNoteCreateRequestDto request) {
-        request.setRecordedById(loginUser.actorOr(request.getRecordedById()));
+        request.setRecordedById(loginUser.chosenOrLogin(request.getRecordedById()));
         return ApiResponse.success(careService.createRecord(request));
     }
 
@@ -62,6 +63,7 @@ public class CareController {
     @Operation(summary = "응급 처치 기록", description = "UC-CARE-03 · 처치기록(orderId=GR2 참조 권장)")
     @PostMapping("/treatments")
     public ApiResponse<TreatmentRecordDto> createTreatment(@RequestBody TreatmentCreateRequestDto request) {
+        request.setPerformedById(loginUser.chosenOrLogin(request.getPerformedById()));
         return ApiResponse.success(careService.createTreatment(request));
     }
 
@@ -74,6 +76,7 @@ public class CareController {
     @Operation(summary = "약물 투여 기록(MAR)", description = "UC-CARE-04 · 투여기록. 처방자장은 GR2, orderId 필수 권장")
     @PostMapping("/medication-administrations")
     public ApiResponse<MarDto> createMar(@RequestBody MarCreateRequestDto request) {
+        request.setAdministeredById(loginUser.chosenOrLogin(request.getAdministeredById()));
         return ApiResponse.success(careService.createMar(request));
     }
 
@@ -89,11 +92,18 @@ public class CareController {
         if (request.getEvents() != null) {
             for (CprTimelineCreateRequestDto.CprEventItemDto event : request.getEvents()) {
                 if (event != null) {
-                    event.setRecordedById(loginUser.actorOr(event.getRecordedById()));
+                    event.setRecordedById(loginUser.chosenOrLogin(event.getRecordedById()));
                 }
             }
         }
         return ApiResponse.success(careService.createCprTimeline(request));
+    }
+
+    @Operation(summary = "접수 취소 가능 여부 조회",
+            description = "접수 서비스가 접수를 취소하기 전에 미리 묻는 사전 안내(연계:RCP, 아무것도 바꾸지 않음). 진료 기록이 있으면 cancellable=false 와 기록 종류를 준다. 최종 판단은 취소 이벤트를 받을 때 응급이 다시 한다")
+    @GetMapping("/reception-intakes/cancellable")
+    public ApiResponse<ReceptionCancellableDto> checkReceptionCancellable(@RequestParam String receptionId) {
+        return ApiResponse.success(receptionCancellationService.check(receptionId));
     }
 
     @Operation(summary = "응급접수 정보 수신", description = "UC-CARE-01 보조 · RCP가 응급 접수 발생 시 호출(연계:RCP). 재전송 시 upsert")

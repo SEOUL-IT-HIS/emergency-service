@@ -15,10 +15,11 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     /**
      * 다른 서비스가 서버끼리 부르는 API — 브라우저가 아니라 쿠키(세션)가 없으므로 로그인 검사에서 뺀다.
-     * 접수 서비스: 중복 접수 확인(GET /care/patients/active), 접수 정보 REST 전송(POST /care/reception-intakes).
+     * 접수 서비스: 중복 접수 확인(GET /care/patients/active), 접수 취소 가능 여부(GET /care/reception-intakes/cancellable), 접수 정보 REST 전송(POST /care/reception-intakes).
      */
     static final Set<String> SERVER_TO_SERVER = Set.of(
             "GET /api/emergency/care/patients/active",
+            "GET /api/emergency/care/reception-intakes/cancellable",
             "POST /api/emergency/care/reception-intakes");
 
     private final LoginUserResolver loginUserResolver;

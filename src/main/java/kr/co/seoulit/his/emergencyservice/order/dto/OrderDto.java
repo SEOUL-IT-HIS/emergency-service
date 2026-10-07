@@ -36,6 +36,16 @@ public class OrderDto {
     private String labSendStatus;
     private String pharmacySendStatus;
 
+    /**
+     * 약제 조제 상태(약제에서 조회한 값, 응급 DB에 저장하지 않음). 약제 전송이 SENT 인 처방을 조회·목록으로 읽을 때만 채우고,
+     * 약제에 처방이 아직 없거나 약제에 연결하지 못하면 null.
+     * pharmacyStatus: RECEIVED / DISPENSED / REJECTED / CANCELLED, pharmacyReleaseStatus: RELEASED / CANCELLED / null,
+     * pharmacyCancelOutcome: APPLIED(약제에 반영됨) / REFUSED(불출 이후라 미반영) / null(취소 통보 없음)
+     */
+    private String pharmacyStatus;
+    private String pharmacyReleaseStatus;
+    private String pharmacyCancelOutcome;
+
     /** 등록 때 dispatchNow=true 인 경우만: 전송 직후 실제 상태 SENT / FAILED / PENDING / REQUESTED(상태를 못 읽음) / NOT_APPLICABLE(해당 항목 없음). 요청하지 않았으면 null */
     private String labDispatchStatus;
     private String pharmacyDispatchStatus;

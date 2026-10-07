@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface TreatmentRecordRepository extends JpaRepository<TreatmentRecord, String> {
+    boolean existsByReceptionId(String receptionId);
+
     List<TreatmentRecord> findByReceptionId(String receptionId);
     List<TreatmentRecord> findByReceptionIdOrderByPerformedAtAsc(String receptionId);
 }

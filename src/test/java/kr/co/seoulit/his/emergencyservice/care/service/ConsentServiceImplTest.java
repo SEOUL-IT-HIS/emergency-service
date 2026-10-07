@@ -33,7 +33,8 @@ class ConsentServiceImplTest {
         repository = mock(ConsentRecordRepository.class);
         when(repository.save(any(ConsentRecord.class))).thenAnswer(inv -> inv.getArgument(0));
         commonCodeCache = new CommonCodeCache();
-        service = new ConsentServiceImpl(repository, new CommonCodeResolver(commonCodeCache));
+        service = new ConsentServiceImpl(repository, new CommonCodeResolver(commonCodeCache),
+                org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress.class));
     }
 
     private static ConsentRecordCreateRequestDto valid() {
@@ -206,5 +207,17 @@ class ConsentServiceImplTest {
         assertThat(list).hasSize(1);
         assertThat(list.get(0).getId()).isEqualTo("c-1");
         assertThat(list.get(0).getConsentTypeCode()).isEqualTo("05");
+    }
+
+    @Test
+    void aCancelledReceptionRejectsAConsentRecord() {
+        var guard = org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress.class);
+        org.mockito.Mockito.doThrow(new kr.co.seoulit.his.emergencyservice.common.exception.ConflictException("reception cancelled: x"))
+                .when(guard).requireNotCancelled("test-reception-001");
+        ConsentServiceImpl cancelled = new ConsentServiceImpl(repository, new CommonCodeResolver(commonCodeCache), guard);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> cancelled.createConsent(valid()))
+                .isInstanceOf(kr.co.seoulit.his.emergencyservice.common.exception.ConflictException.class);
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).save(any(ConsentRecord.class));
     }
 }

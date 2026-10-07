@@ -60,7 +60,8 @@ class DispositionFollowUpTest {
         resourceService = mock(ResourceService.class);
         service = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
                 transferNoteRepository, cache, new CommonCodeResolver(cache), publisher,
-                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository),
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository,
+                        org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository.class)),
                 resourceService);
     }
 

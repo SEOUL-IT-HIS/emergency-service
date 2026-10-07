@@ -5,5 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface IsolationAssessmentRepository extends JpaRepository<IsolationAssessment, String> {
+    boolean existsByReceptionId(String receptionId);
+
     List<IsolationAssessment> findByReceptionId(String receptionId);
 }

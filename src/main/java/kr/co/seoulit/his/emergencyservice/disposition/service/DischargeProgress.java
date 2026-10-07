@@ -1,5 +1,7 @@
 package kr.co.seoulit.his.emergencyservice.disposition.service;
 
+import kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake;
+import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
 import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.util.InChunks;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
@@ -11,6 +13,7 @@ import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRep
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,6 +39,7 @@ public class DischargeProgress {
     private final DispositionRepository dispositionRepository;
     private final AdmissionRequestRepository admissionRequestRepository;
     private final TransferNoteRepository transferNoteRepository;
+    private final ReceptionIntakeRepository receptionIntakeRepository;
 
     /** 접수 건별 단계. 퇴실 결정이 없는 접수는 NONE */
     public Map<String, Stage> stages(Collection<String> receptionIds) {
@@ -90,15 +94,67 @@ public class DischargeProgress {
     }
 
     /**
-     * 퇴실 처리가 끝난(DONE) 접수에 새로 배치·평가·처방하려는 요청을 막는다 → ConflictException(409).
+     * 퇴실 처리가 끝난(DONE) 접수 또는 접수에서 취소한 접수에 새로 배치·평가·처방하려는 요청을 막는다 → ConflictException(409).
      * 병상 배정, KTAS·활력징후·격리·위험 스크리닝 등록, 처방 등록에 쓴다. 진료기록·처치·투약·CPR·동의 같은 사후 기록과
      * 해제·취소 같은 정리 작업은 퇴실 뒤에도 필요하므로 이 검사를 걸지 않는다. 병동 대기(WAITING_WARD) 중은 아직 응급실에 있으니 허용한다.
      */
     public void requireNotDischarged(String receptionId) {
-        if (receptionId != null && !receptionId.isBlank() && stage(receptionId) == Stage.DONE) {
+        if (receptionId == null || receptionId.isBlank()) {
+            return;
+        }
+        requireNotCancelled(receptionId);
+        if (stage(receptionId) == Stage.DONE) {
             throw new ConflictException("reception already discharged: " + receptionId);
         }
     }
+
+    /**
+     * 접수에서 취소한 접수에 입력하려는 요청을 막는다 → ConflictException(409).
+     * 진료기록·처치·투약·CPR·동의처럼 퇴실 뒤에는 허용하는 사후 기록도 취소된 접수에는 남기지 않는다
+     * (목록에서 사라진 접수에 기록이 붙으면 아무도 볼 수 없다).
+     */
+    public void requireNotCancelled(String receptionId) {
+        if (receptionId == null || receptionId.isBlank()) {
+            return;
+        }
+        if (receptionIntakeRepository.findById(receptionId).filter(ReceptionIntake::isCancelled).isPresent()) {
+            throw new ConflictException("reception cancelled: " + receptionId);
+        }
+    }
+
+    /** 사건 시각을 검증할 때 서버-화면 시계 차이를 허용하는 시간(분) */
+    static final long EVENT_TIME_TOLERANCE_MINUTES = 5;
+
+    /**
+     * 투약·CPR·동의처럼 "그때 있었던 일"의 시각이 응급실에 있던 동안인지 확인한다 → IllegalArgumentException(400).
+     * 접수 시각보다 이를 수 없고, 현재보다 미래일 수 없으며, 귀가·사망·자의퇴원이면 퇴실 결정 시각보다 늦을 수 없다
+     * (입원·전원은 병상·소견서가 나올 때까지 응급실에 있으므로 퇴실 쪽 상한을 두지 않는다).
+     * 기록을 입력하는 시점은 퇴실 뒤여도 된다(사후 기록) — 막는 것은 사건 시각뿐이다. 시각이 없으면(지금으로 채움) 확인하지 않는다.
+     */
+    public void requireEventTimeDuringStay(String receptionId, LocalDateTime at, String field) {
+        if (at == null || receptionId == null || receptionId.isBlank()) {
+            return;
+        }
+        if (at.isAfter(LocalDateTime.now().plusMinutes(EVENT_TIME_TOLERANCE_MINUTES))) {
+            throw new IllegalArgumentException(field + " must not be in the future");
+        }
+        receptionIntakeRepository.findById(receptionId)
+                .map(ReceptionIntake::getReceivedAt)
+                .filter(receivedAt -> at.isBefore(receivedAt))
+                .ifPresent(receivedAt -> {
+                    throw new IllegalArgumentException(field + " must not be before the reception time");
+                });
+        dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream().findFirst()
+                .filter(d -> LEAVES_AT_DECISION.contains(d.getDispositionTypeCode()) && d.getDecidedAt() != null)
+                .filter(d -> at.isAfter(d.getDecidedAt().plusMinutes(EVENT_TIME_TOLERANCE_MINUTES)))
+                .ifPresent(d -> {
+                    throw new IllegalArgumentException(field + " must not be after the discharge time");
+                });
+    }
+
+    /** 결정한 시각에 응급실을 떠난 것으로 보는 퇴실 유형 */
+    private static final Set<String> LEAVES_AT_DECISION = Set.of(
+            EmgCodes.DISPOSITION_HOME, EmgCodes.DISPOSITION_DEATH, EmgCodes.DISPOSITION_DAMA);
 
     public Set<String> doneReceptionIds(Collection<String> receptionIds) {
         return stages(receptionIds).entrySet().stream()

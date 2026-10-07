@@ -18,7 +18,7 @@ import java.util.List;
 public class MonitorController {
 
     private final MonitorService monitorService;
-    // 확인자는 로그인한 사용자로 기록한다
+    // 확인자는 화면에서 고른 직원이고, 비어 있으면 로그인한 사용자로 채운다
     private final LoginUserResolver loginUser;
 
     @Operation(summary = "응급실 종합 현황판", description = "UC-MON-01 · 대시보드")
@@ -39,7 +39,7 @@ public class MonitorController {
     public ApiResponse<LosAlertDto> acknowledgeLongStayAlert(
             @PathVariable String alertId,
             @RequestBody LosAlertAcknowledgeRequestDto request) {
-        request.setAcknowledgedById(loginUser.actorOr(request.getAcknowledgedById()));
+        request.setAcknowledgedById(loginUser.chosenOrLogin(request.getAcknowledgedById()));
         return ApiResponse.success(monitorService.acknowledgeLongStayAlert(alertId, request));
     }
 }

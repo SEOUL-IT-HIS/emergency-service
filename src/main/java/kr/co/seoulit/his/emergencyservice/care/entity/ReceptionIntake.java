@@ -33,10 +33,17 @@ public class ReceptionIntake {
     @Column(name = "CHIEF_COMPLAINT_RAW", length = 500)
     private String chiefComplaintRaw;
 
+    // 접수 취소 시각 - 값이 있으면 취소된 접수(삭제하지 않고 상태로 남긴다). RCP 의 ReceptionCancelled 이벤트로 채워진다.
+    @Column(name = "CANCELLED_AT")
+    private LocalDateTime cancelledAt;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;
 
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
 
+    public boolean isCancelled() {
+        return cancelledAt != null;
+    }
 }

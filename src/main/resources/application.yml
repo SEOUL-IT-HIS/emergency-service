@@ -42,14 +42,18 @@ app:
     department-code: "10"
     # 구두처방 verbalYn(Y/N)을 처방코어로 전달한다(2026-10-02 처방코어 안내). 문제가 생기면 false 로 끈다
     forward-verbal-yn: true
-    # 약제(PHM) 전송 사용 여부. 약제 서비스가 이번 범위에서 빠져 기본 false — 켜면 등록 직후 전송과 POST /orders/{id}/dispatch-pharmacy 가 다시 동작한다
-    pharmacy-enabled: false
-    # 검사항목 목록을 처방코어에서 받아 두는 시간(분). 처방코어↔LAB 연결이 끊겨 검색이 실패해도 받아 둔 목록으로 응답한다. 0이면 매번 처방코어에 묻는다
-    lab-item-cache-minutes: 10
+    # 약제(PHM) 연동 사용 여부(2026-10-07 처방코어·약제와 합의해 켬). false 면 약제 전송(등록 직후·POST /orders/{id}/dispatch-pharmacy)과 조제 상태 조회를 하지 않는다
+    pharmacy-enabled: true
+  pharmacy:
+    # 약제(PHM) 서비스 base-url — 조제 상태 조회(GET /api/pharmacy/prescriptions?prescriptionId=)에 쓴다. 개인 PC 개발 시 application-local.yml 에서 덮어쓴다(개발 서버 http://192.168.1.125:8082)
+    base-url: ${PHARMACY_BASE_URL:http://localhost:8082}
   kafka:
     # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
     intake:
       enabled: true
+      # 접수 이벤트 컨슈머 그룹(기본 emergency-service). 개발 PC가 공용 서버와 같은 브로커를 볼 때는 application-local.yml 에서 PC 전용 그룹으로 바꾼다
+      group-id: emergency-service
+      auto-offset-reset: earliest
     # 입원요청(응급→병동) Kafka 연동. 켤 때만 true(개인 PC 개발용 값은 application-local.yml 에 둔다). 토픽 기본값: emergency.admission.requested.v1 /
     # inpatient.admission.bed-assigned.v1 / inpatient.admission.rejected.v1 (app.kafka.admission.*-topic 으로 변경 가능)
     admission:
