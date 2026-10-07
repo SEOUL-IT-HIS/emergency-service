@@ -10,6 +10,9 @@ import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
+import kr.co.seoulit.his.emergencyservice.order.client.PharmacyClient;
+import kr.co.seoulit.his.emergencyservice.order.client.PharmacyMedication;
+import kr.co.seoulit.his.emergencyservice.order.client.PharmacyPrescriptionStatus;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderDispatchDto;
@@ -42,6 +45,7 @@ class OrderServiceImplTest {
     private static final String ORDER_ID = "3f2b8c1e-7a4d-4e5b-9c61-2d8f0a1b5e77";
 
     private OrderCoreClient client;
+    private PharmacyClient pharmacy;
     private ReceptionIntakeRepository receptionIntakeRepository;
     private DischargeProgress dischargeProgress;
     private OrderServiceImpl service;
@@ -49,6 +53,9 @@ class OrderServiceImplTest {
     @BeforeEach
     void setUp() {
         client = mock(OrderCoreClient.class);
+        pharmacy = mock(PharmacyClient.class);
+        // 기본: 약제에 연결은 되지만 처방이 아직 없다
+        when(pharmacy.query(anyString())).thenReturn(new PharmacyClient.Lookup(true, null));
         receptionIntakeRepository = mock(ReceptionIntakeRepository.class);
         dischargeProgress = mock(DischargeProgress.class);
         ReceptionIntake intake = new ReceptionIntake();
@@ -81,7 +88,7 @@ class OrderServiceImplTest {
 
     private OrderServiceImpl newService(boolean forwardVerbalYn, boolean pharmacyEnabled) {
         CommonCodeCache cache = new CommonCodeCache();
-        return new OrderServiceImpl(client, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress,
+        return new OrderServiceImpl(client, pharmacy, receptionIntakeRepository, new CommonCodeResolver(cache), dischargeProgress,
                 "10", forwardVerbalYn, pharmacyEnabled);
     }
 
@@ -96,11 +103,11 @@ class OrderServiceImplTest {
     private OrderItemDto drug() {
         OrderItemDto item = new OrderItemDto();
         item.setPrescriptionType("약품");
-        item.setItemCode("195700020");
+        item.setItemCode("EDI-TYLENOL-500");
         item.setItemName("타이레놀정500mg");
         item.setDosage(1.0);
         item.setDosageFormCd("TAB");
-        item.setFrequency("TID");
+        item.setFrequency("3");
         item.setDurationDays("3");
         return item;
     }
@@ -257,11 +264,11 @@ class OrderServiceImplTest {
         assertThat(dto.getVerbalConfirmedBy()).isEqualTo("dr-9");
     }
 
-    private static kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication medication(String name, String edi) {
-        var m = new kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication();
-        m.setMedicationId("1");
+    private static PharmacyMedication medication(String name, String edi, String dosageForm) {
+        var m = new PharmacyMedication();
         m.setMedicationName(name);
         m.setEdiCode(edi);
+        m.setDosageFormCd(dosageForm);
         m.setFormCodeName("주사제");
         m.setEntpName("제조사");
         m.setEtcOtcName("전문의약품");
@@ -269,42 +276,38 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void medicationSearchUsesTheEdiCodeAsTheItemCode() {
-        when(client.searchMedications("케토")).thenReturn(List.of(medication("케토로락주 30mg", "ER-KETO-30")));
+    void medicationListComesFromThePharmacyMasterWithTheEdiCodeAndDosageForm() {
+        when(pharmacy.listMedications("케토")).thenReturn(List.of(medication("케토로락주 30mg", "ER-KETO-30", "03")));
 
         var found = service.searchMedications("  케토 ");   // 공백은 뗀다
 
         assertThat(found).hasSize(1);
         assertThat(found.get(0).getItemCode()).isEqualTo("ER-KETO-30");
         assertThat(found.get(0).getItemName()).isEqualTo("케토로락주 30mg");
+        assertThat(found.get(0).getDosageFormCd()).isEqualTo("03");
         assertThat(found.get(0).getFormName()).isEqualTo("주사제");
+        verifyNoInteractions(client);   // 처방코어를 거치지 않는다
     }
 
     @Test
-    void medicationSearchNeedsANameAndNeverCallsTheOrderCoreWithoutOne() {
-        assertThatThrownBy(() -> service.searchMedications(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.searchMedications(null)).isInstanceOf(IllegalArgumentException.class);
-        verify(client, never()).searchMedications(anyString());
+    void withoutANameTheWholeMasterIsListed() {
+        when(pharmacy.listMedications("")).thenReturn(List.of(medication("가", "A", "01"), medication("나", "B", null)));
+
+        assertThat(service.searchMedications(null)).extracting("itemCode").containsExactly("A", "B");
+        assertThat(service.searchMedications("  ")).hasSize(2);
     }
 
     @Test
-    void medicationSearchSkipsEntriesWithoutACodeAndCapsTheResult() {
-        var many = new java.util.ArrayList<kr.co.seoulit.his.emergencyservice.order.client.OrderCoreMedication>();
-        many.add(medication("코드 없는 약", null));
-        for (int i = 0; i < 40; i++) {
-            many.add(medication("약" + i, "C" + i));
-        }
-        when(client.searchMedications("약")).thenReturn(many);
+    void medicationsWithoutACodeOrNameAreLeftOut() {
+        when(pharmacy.listMedications("")).thenReturn(List.of(
+                medication("코드 없는 약", null, "01"), medication("", "X", "01"), medication("정상", "OK", "01")));
 
-        var found = service.searchMedications("약");
-
-        assertThat(found).hasSize(OrderServiceImpl.MEDICATION_SEARCH_LIMIT);
-        assertThat(found).noneMatch(m -> "코드 없는 약".equals(m.getItemName()));
+        assertThat(service.searchMedications("")).extracting("itemCode").containsExactly("OK");
     }
 
     @Test
-    void medicationSearchPassesTheOrderCoreOutageOn() {
-        when(client.searchMedications("약")).thenThrow(new ExternalServiceException("order core is not reachable"));
+    void medicationListPassesThePharmacyOutageOn() {
+        when(pharmacy.listMedications("약")).thenThrow(new ExternalServiceException("pharmacy is not reachable"));
 
         assertThatThrownBy(() -> service.searchMedications("약")).isInstanceOf(ExternalServiceException.class);
     }
@@ -405,6 +408,106 @@ class OrderServiceImplTest {
         assertThat(orders.get(0).getPharmacySendStatus()).isEqualTo("PENDING");
         assertThat(orders.get(1).getEncounterId()).isEqualTo(RECEPTION_ID);   // 목록에 receptionId 가 없으면 요청 값으로 채움
         assertThat(orders.get(0).getItems()).isNull();                         // 가벼운 목록 — 상세는 단건 조회
+    }
+
+    @Test
+    void drugFrequencyAndDaysMustBeWholeNumbersBecauseThePharmacyReadsAnythingElseAsOne() {
+        for (String bad : new String[] {"TID", "", " ", "0", "1.5", "-1", "1000"}) {
+            OrderItemDto badFrequency = drug();
+            badFrequency.setFrequency(bad);
+            assertThatThrownBy(() -> service.createOrder(request(badFrequency)))
+                    .as("frequency '%s'", bad).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("frequency");
+            OrderItemDto badDays = drug();
+            badDays.setDurationDays(bad);
+            assertThatThrownBy(() -> service.createOrder(request(badDays)))
+                    .as("durationDays '%s'", bad).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("durationDays");
+        }
+        OrderItemDto once = drug();
+        once.setFrequency("1");
+        once.setDurationDays("1");
+        assertThat(service.createOrder(request(once)).getOrderId()).isEqualTo(ORDER_ID);
+        // 검사에는 횟수·일수가 필요 없다
+        assertThat(service.createOrder(request(lab())).getOrderId()).isEqualTo(ORDER_ID);
+    }
+
+    private PharmacyPrescriptionStatus pharmacyStatus(String status, String releaseStatus, String cancelOutcome) {
+        PharmacyPrescriptionStatus s = new PharmacyPrescriptionStatus();
+        s.setStatus(status);
+        s.setReleaseStatusCd(releaseStatus);
+        s.setCancelOutcome(cancelOutcome);
+        return s;
+    }
+
+    private OrderCancelRequestDto cancelRequest() {
+        OrderCancelRequestDto request = new OrderCancelRequestDto();
+        request.setCancelReason("오더 오류");
+        request.setUserId("dr-1");
+        return request;
+    }
+
+    @Test
+    void readingASentOrderShowsThePharmacyStateReadFromThePharmacy() {
+        when(pharmacy.query(ORDER_ID)).thenReturn(new PharmacyClient.Lookup(true, pharmacyStatus("DISPENSED", "RELEASED", null)));
+
+        OrderDto dto = service.getOrder(ORDER_ID);
+
+        assertThat(dto.getPharmacyStatus()).isEqualTo("DISPENSED");
+        assertThat(dto.getPharmacyReleaseStatus()).isEqualTo("RELEASED");
+        assertThat(dto.getPharmacyCancelOutcome()).isNull();
+    }
+
+    @Test
+    void theOrderIsStillReturnedWhenThePharmacyHasNoRecordYetOrCannotBeReached() {
+        OrderDto noRecord = service.getOrder(ORDER_ID);
+        assertThat(noRecord.getPharmacySendStatus()).isEqualTo("SENT");
+        assertThat(noRecord.getPharmacyStatus()).isNull();
+
+        when(pharmacy.query(ORDER_ID)).thenReturn(new PharmacyClient.Lookup(false, null));
+        assertThat(service.getOrder(ORDER_ID).getPharmacyStatus()).isNull();
+    }
+
+    @Test
+    void thePharmacyIsNotAskedForOrdersNotSentToItOrWhenPharmacyIsDisabled() {
+        when(client.get(ORDER_ID)).thenReturn(afterDispatch("SENT", "PENDING"));
+        service.getOrder(ORDER_ID);
+        OrderServiceImpl noPharmacy = newService(false, false);
+        when(client.get(ORDER_ID)).thenReturn(afterDispatch("SENT", "SENT"));
+        noPharmacy.getOrder(ORDER_ID);
+
+        verifyNoInteractions(pharmacy);
+    }
+
+    @Test
+    void listStopsAskingThePharmacyAfterTheFirstConnectionFailure() {
+        OrderCorePrescription first = new OrderCorePrescription();
+        first.setPrescriptionId("o-1");
+        first.setPrescribedAt("2026-10-02T10:00:00");
+        first.setPharmacySendStatus("SENT");
+        OrderCorePrescription second = new OrderCorePrescription();
+        second.setPrescriptionId("o-2");
+        second.setPrescribedAt("2026-10-02T09:00:00");
+        second.setPharmacySendStatus("SENT");
+        when(client.listByReception(RECEPTION_ID)).thenReturn(List.of(first, second));
+        when(pharmacy.query(anyString())).thenReturn(new PharmacyClient.Lookup(false, null));
+
+        List<OrderDto> orders = service.listOrders(RECEPTION_ID);
+
+        assertThat(orders).hasSize(2);
+        verify(pharmacy).query("o-1");
+        verify(pharmacy, never()).query("o-2");
+    }
+
+    @Test
+    void afterCancelThePharmacyOutcomeIsShownSoARefusedCancelIsNotHidden() {
+        OrderCorePrescription cancelled = afterDispatch("SENT", "SENT");
+        cancelled.setStatus("CANCELLED");
+        when(client.get(ORDER_ID)).thenReturn(cancelled);
+        when(pharmacy.query(ORDER_ID)).thenReturn(new PharmacyClient.Lookup(true, pharmacyStatus("DISPENSED", "RELEASED", "REFUSED")));
+
+        OrderDto dto = service.cancelOrder(ORDER_ID, cancelRequest());
+
+        assertThat(dto.getStatus()).isEqualTo("CANCELLED");
+        assertThat(dto.getPharmacyCancelOutcome()).isEqualTo("REFUSED");
     }
 
     @Test

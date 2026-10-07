@@ -40,9 +40,9 @@ public class OrderController {
         return ApiResponse.success(orderService.listOrders(encounterId));
     }
 
-    @Operation(summary = "약품 검색", description = "처방 등록 때 약품(itemCode=약품 마스터 ediCode, itemName)을 고르는 용도. 처방코어 medications/search 호출. name(약품명 일부)이 필수 — 비면 400. 최대 30건. 처방코어가 응답하지 못하면 502")
+    @Operation(summary = "약품 목록", description = "처방 등록 때 약품(itemCode=약품 마스터 ediCode, itemName, dosageFormCd)을 고르는 용도. 약제 medications/page 호출(EDI 코드가 있는 약품만, 이름순). name(약품명 일부)은 선택 — 비우면 전체(최대 500건). 약제가 응답하지 못하면 502")
     @GetMapping("/medications")
-    public ApiResponse<List<MedicationDto>> searchMedications(@RequestParam String name) {
+    public ApiResponse<List<MedicationDto>> searchMedications(@RequestParam(required = false) String name) {
         return ApiResponse.success(orderService.searchMedications(name));
     }
 

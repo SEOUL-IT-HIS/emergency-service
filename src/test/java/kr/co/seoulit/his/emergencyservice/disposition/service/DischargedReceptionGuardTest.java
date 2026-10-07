@@ -74,7 +74,7 @@ class DischargedReceptionGuardTest {
         intake.setId("r-1");
         intake.setPatientId("p-1");
         when(receptions.findById("r-1")).thenReturn(Optional.of(intake));
-        orderService = new OrderServiceImpl(orderCoreClient, receptions, new CommonCodeResolver(cache), dischargeProgress, "10", true, true);
+        orderService = new OrderServiceImpl(orderCoreClient, mock(kr.co.seoulit.his.emergencyservice.order.client.PharmacyClient.class), receptions, new CommonCodeResolver(cache), dischargeProgress, "10", true, true);
     }
 
     /** r-1 이 귀가로 퇴실 처리 완료(DONE)된 상태 */

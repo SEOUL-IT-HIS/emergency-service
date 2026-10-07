@@ -29,7 +29,6 @@ import java.util.function.Supplier;
  *  - 등록   POST  /api/outpatient/prescriptions/emergency/{receptionId}
  *  - 조회   GET   /api/outpatient/prescriptions/{prescriptionId}
  *  - 목록   GET   /api/outpatient/prescriptions?receptionId=   (items 없는 가벼운 목록 + 전송 상태 요약)
- *  - 약품 검색 GET /api/outpatient/prescriptions/medications/search?name=   (약품 마스터, name 필수 — 비면 500)
  *  - 구두확정 PATCH /api/outpatient/prescriptions/{prescriptionId}/verbal-confirm?confirmedBy=
  *  - 취소   PATCH /api/outpatient/prescriptions/{prescriptionId}/deactivate?cancelReason=&userId=
  *  - 전송   POST  /api/outpatient/prescriptions/{prescriptionId}/dispatch-lab | dispatch-pharmacy (자동 호출 아님)
@@ -98,26 +97,6 @@ public class OrderCoreClient {
             ResponseEntity<OrderCoreResponse<List<OrderCorePrescription>>> response = restTemplate.exchange(
                     uri, HttpMethod.GET, null,
                     new ParameterizedTypeReference<OrderCoreResponse<List<OrderCorePrescription>>>() {
-                    });
-            return response.getBody() == null ? null : response.getBody().getData();
-        });
-        return found == null ? List.of() : found;
-    }
-
-    /**
-     * 약품 검색(처방코어 약품 마스터). name 은 약품명 일부 — 비어 있으면 처방코어가 500(OPD999)을 주므로 호출하지 않는다.
-     * 응답이 비어 있으면 빈 목록.
-     */
-    public List<OrderCoreMedication> searchMedications(String name) {
-        URI uri = UriComponentsBuilder.fromUriString(baseUrl + PRESCRIPTIONS + "/medications/search")
-                .queryParam("name", "{name}")
-                .encode()
-                .buildAndExpand(name.trim())
-                .toUri();
-        List<OrderCoreMedication> found = call("search medications", name, () -> {
-            ResponseEntity<OrderCoreResponse<List<OrderCoreMedication>>> response = restTemplate.exchange(
-                    uri, HttpMethod.GET, null,
-                    new ParameterizedTypeReference<OrderCoreResponse<List<OrderCoreMedication>>>() {
                     });
             return response.getBody() == null ? null : response.getBody().getData();
         });

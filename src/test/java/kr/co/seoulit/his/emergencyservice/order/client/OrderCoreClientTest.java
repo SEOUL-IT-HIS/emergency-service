@@ -181,31 +181,6 @@ class OrderCoreClientTest {
     }
 
     @Test
-    void searchMedicationsSendsTheNameAndReadsTheMasterFields() {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/api/outpatient/prescriptions/medications/search?name=")))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":[{\"medicationId\":4131,\"medicationName\":\"타이레놀정500mg\","
-                        + "\"ediCode\":\"EDI-TYLENOL-500\",\"formCodeName\":\"정제\",\"entpName\":\"한국얀센\",\"etcOtcName\":\"일반의약품\",\"chart\":null}]}",
-                        MediaType.APPLICATION_JSON));
-
-        List<OrderCoreMedication> found = client.searchMedications(" 타이레놀 ");   // 앞뒤 공백은 뗀다
-
-        assertThat(found).hasSize(1);
-        assertThat(found.get(0).getMedicationId()).isEqualTo("4131");
-        assertThat(found.get(0).getEdiCode()).isEqualTo("EDI-TYLENOL-500");
-        assertThat(found.get(0).getFormCodeName()).isEqualTo("정제");
-        server.verify();
-    }
-
-    @Test
-    void aMissingMedicationListIsAnEmptyList() {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/api/outpatient/prescriptions/medications/search?name=")))
-                .andRespond(withSuccess("{\"code\":\"SUCCESS\",\"data\":null}", MediaType.APPLICATION_JSON));
-
-        assertThat(client.searchMedications("없는약")).isEmpty();
-    }
-
-    @Test
     void verbalConfirmPatchesWithTheDoctorAsAQueryParameterAndConflictsAreNotUpstreamErrors() {
         server.expect(requestTo(BASE + "/api/outpatient/prescriptions/" + ORDER_ID + "/verbal-confirm?confirmedBy=dr-9"))
                 .andExpect(method(HttpMethod.PATCH)).andRespond(withSuccess());

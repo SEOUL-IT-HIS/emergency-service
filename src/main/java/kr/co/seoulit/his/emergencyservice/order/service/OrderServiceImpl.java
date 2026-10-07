@@ -10,6 +10,7 @@ import kr.co.seoulit.his.emergencyservice.disposition.service.DischargeProgress;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreCreateRequest;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCorePrescription;
+import kr.co.seoulit.his.emergencyservice.order.client.PharmacyClient;
 import kr.co.seoulit.his.emergencyservice.order.dto.MedicationDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCancelRequestDto;
 import kr.co.seoulit.his.emergencyservice.order.dto.OrderCreateRequestDto;
@@ -57,6 +58,7 @@ public class OrderServiceImpl implements OrderService {
     static final String DISPATCH_REQUESTED = "REQUESTED";
 
     private final OrderCoreClient orderCoreClient;
+    private final PharmacyClient pharmacyClient;
     private final ReceptionIntakeRepository receptionIntakeRepository;
     private final CommonCodeResolver codeResolver;
     private final DischargeProgress dischargeProgress;
@@ -65,12 +67,14 @@ public class OrderServiceImpl implements OrderService {
     /** 약제(PHM) 전송을 쓰는지. 약제 서비스가 이번 배포에 없으면 false — 전송해도 받는 곳이 없다 */
     private final boolean pharmacyEnabled;
 
-    public OrderServiceImpl(OrderCoreClient orderCoreClient, ReceptionIntakeRepository receptionIntakeRepository,
+    public OrderServiceImpl(OrderCoreClient orderCoreClient, PharmacyClient pharmacyClient,
+                            ReceptionIntakeRepository receptionIntakeRepository,
                             CommonCodeResolver codeResolver, DischargeProgress dischargeProgress,
                             @Value("${app.order.department-code:10}") String departmentCode,
                             @Value("${app.order.forward-verbal-yn:true}") boolean forwardVerbalYn,
                             @Value("${app.order.pharmacy-enabled:false}") boolean pharmacyEnabled) {
         this.orderCoreClient = orderCoreClient;
+        this.pharmacyClient = pharmacyClient;
         this.receptionIntakeRepository = receptionIntakeRepository;
         this.codeResolver = codeResolver;
         this.dischargeProgress = dischargeProgress;
@@ -134,7 +138,7 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("encounterId is required");
         }
         // 시각은 같은 형식의 ISO 문자열이라 문자열 비교가 시간 순서와 같다. 시각이 없는 건은 뒤로.
-        return orderCoreClient.listByReception(encounterId).stream()
+        List<OrderDto> orders = orderCoreClient.listByReception(encounterId).stream()
                 .map(core -> {
                     OrderDto dto = toDto(core);
                     if (dto.getEncounterId() == null) {
@@ -144,27 +148,29 @@ public class OrderServiceImpl implements OrderService {
                 })
                 .sorted(Comparator.comparing(OrderDto::getPrescribedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+        // 약제에 보낸 처방의 조제 상태를 붙인다. 약제에 연결하지 못하면 나머지는 조회하지 않는다(목록이 늦어지지 않게)
+        for (OrderDto dto : orders) {
+            if (!attachPharmacyStatus(dto)) {
+                break;
+            }
+        }
+        return orders;
     }
-
-    /** 약품 검색 결과를 화면에 한 번에 내려주는 최대 건수 */
-    static final int MEDICATION_SEARCH_LIMIT = 30;
 
     @Override
     public List<MedicationDto> searchMedications(String name) {
-        if (!StringUtils.hasText(name)) {
-            // 이름 없이 부르면 처방코어가 500 을 주므로 호출하지 않는다
-            throw new IllegalArgumentException("name is required");
-        }
-        return orderCoreClient.searchMedications(name.trim()).stream()
-                .filter(core -> StringUtils.hasText(core.getEdiCode()) && StringUtils.hasText(core.getMedicationName()))
-                .limit(MEDICATION_SEARCH_LIMIT)
-                .map(core -> {
+        // 처방코어를 거치지 않고 약제 약품 마스터를 직접 읽는다(제형 코드까지 온다). name 이 비면 전체 목록
+        String keyword = name == null ? "" : name.trim();
+        return pharmacyClient.listMedications(keyword).stream()
+                .filter(med -> StringUtils.hasText(med.getEdiCode()) && StringUtils.hasText(med.getMedicationName()))
+                .map(med -> {
                     MedicationDto dto = new MedicationDto();
-                    dto.setItemCode(core.getEdiCode());
-                    dto.setItemName(core.getMedicationName());
-                    dto.setFormName(core.getFormCodeName());
-                    dto.setManufacturer(core.getEntpName());
-                    dto.setCategory(core.getEtcOtcName());
+                    dto.setItemCode(med.getEdiCode());
+                    dto.setItemName(med.getMedicationName());
+                    dto.setDosageFormCd(med.getDosageFormCd());
+                    dto.setFormName(med.getFormCodeName());
+                    dto.setManufacturer(med.getEntpName());
+                    dto.setCategory(med.getEtcOtcName());
                     return dto;
                 })
                 .toList();
@@ -194,7 +200,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderDto getOrder(String orderId) {
         requireOrderId(orderId);
-        return toDto(orderCoreClient.get(orderId));
+        OrderDto dto = toDto(orderCoreClient.get(orderId));
+        attachPharmacyStatus(dto);
+        return dto;
     }
 
     @Override
@@ -206,7 +214,10 @@ public class OrderServiceImpl implements OrderService {
         orderCoreClient.deactivate(orderId, request.getCancelReason(), request.getUserId());
         log.info("응급 처방 취소 - orderId={}, userId={}", orderId, request.getUserId());
         try {
-            return toDto(orderCoreClient.get(orderId));
+            // 취소 통보는 비동기라 약제 반영 결과(cancelOutcome)는 바로는 비어 있을 수 있다 — 다시 읽을 때 채워진다
+            OrderDto dto = toDto(orderCoreClient.get(orderId));
+            attachPharmacyStatus(dto);
+            return dto;
         } catch (RuntimeException e) {
             // 취소는 끝났다. 최신 상태를 못 읽어도 취소 결과 자체는 성공으로 돌려준다
             log.warn("취소 뒤 처방 조회에 실패했다 - orderId={}, {}", orderId, e.getMessage());
@@ -237,6 +248,23 @@ public class OrderServiceImpl implements OrderService {
 
     // ---------------------------------------------------------------- 내부
 
+    /**
+     * 약제로 전송(SENT)된 처방이면 약제에서 조제 상태를 읽어 dto 에 붙인다. 약제 연동이 꺼져 있거나 전송 전이면 조회하지 않는다.
+     * 돌려주는 값은 "계속 조회해도 되는지" — 약제에 연결하지 못했을 때만 false. 약제에 처방이 아직 없는 것은 연결 실패가 아니다.
+     */
+    private boolean attachPharmacyStatus(OrderDto dto) {
+        if (!pharmacyEnabled || !DISPATCH_SENT.equals(dto.getPharmacySendStatus()) || !StringUtils.hasText(dto.getOrderId())) {
+            return true;
+        }
+        PharmacyClient.Lookup lookup = pharmacyClient.query(dto.getOrderId());
+        if (lookup.status() != null) {
+            dto.setPharmacyStatus(lookup.status().getStatus());
+            dto.setPharmacyReleaseStatus(lookup.status().getReleaseStatusCd());
+            dto.setPharmacyCancelOutcome(lookup.status().getCancelOutcome());
+        }
+        return lookup.reachable();
+    }
+
     private void validate(OrderCreateRequestDto request) {
         if (request == null || !StringUtils.hasText(request.getEncounterId())
                 || !StringUtils.hasText(request.getPrescribedBy())) {
@@ -266,6 +294,20 @@ public class OrderServiceImpl implements OrderService {
             if (!StringUtils.hasText(item.getItemCode()) || !StringUtils.hasText(item.getItemName())) {
                 throw new IllegalArgumentException("itemCode and itemName are required for every item");
             }
+            if (TYPE_DRUG.equals(item.getPrescriptionType())) {
+                requireWholeNumber("frequency", item.getFrequency());
+                requireWholeNumber("durationDays", item.getDurationDays());
+            }
+        }
+    }
+
+    /**
+     * 약제는 횟수·일수가 숫자가 아니면 1로 계산해 총량이 틀어진다(총량 = 1회량 × 횟수 × 일수). 그래서 약품은 1 이상의 정수만 받는다.
+     * 즉시 1회 투여는 횟수 1, 일수 1.
+     */
+    static void requireWholeNumber(String field, String value) {
+        if (value == null || !value.trim().matches("[1-9][0-9]{0,2}")) {
+            throw new IllegalArgumentException(field + " must be a whole number of 1 or more (drug items)");
         }
     }
 
