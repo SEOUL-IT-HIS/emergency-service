@@ -68,7 +68,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
-| UC-CARE-01 | GET | `/api/emergency/care/patients` | 응급환자 목록. `status`: `IN_CARE`(진료 중) / `DONE`(퇴실 절차 완료) / 생략 시 전체. 저장값이 아니라 계산값(`DischargeProgress`, 현황판 재실 수·장기체류 알림도 같은 기준) — 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동이 병상 배정(02)해야, 전원은 소견서를 써야 DONE. 환자서비스 장애 시 환자명 없이 목록 반환 | date?, status? |
+| UC-CARE-01 | GET | `/api/emergency/care/patients` | 응급환자 목록. `status`: `IN_CARE`(진료 중) / `DONE`(퇴실 절차 완료) / 생략 시 전체. 저장값이 아니라 계산값(`DischargeProgress`, 현황판 재실 수·장기체류 알림도 같은 기준) — 귀가·사망·자의퇴원은 결정 즉시, 입원은 병동이 병상 배정(02)해야, 전원은 소견서를 써야 DONE. 환자서비스 장애 시 환자명 없이 목록 반환. 응답의 `dispositionTypeCode`(최신 퇴실 결정 유형)·`admissionStatusCode`(입원이면 가장 최근 입원요청의 상태 01 요청됨/02 병상 배정/03 거부, 요청 전이면 null)·`assignedWardCode`(배정 병동)로 목록에 입원 배지를 보인다 | date?, status? |
 | (접수 연동) | GET | `/api/emergency/care/patients/active` | 한 환자의 **진행 중(퇴실 처리 전, `DischargeProgress` 기준)인 응급 접수** 목록을 접수 시각 오름차순으로. **접수 후 `sinceHours`(기본 48)시간이 지난 건은 퇴실 누락·테스트 데이터로 보고 제외.** 없으면 빈 목록. 접수 서비스가 새 접수 전에 호출해 같은 환자 중복 접수를 경고하는 용도(경고용 — 차단 여부는 접수 쪽이 정하고, 응급 서버가 응답하지 않으면 접수는 그대로 진행). 응답 `receptionId`, `patientId`, `receivedAt`. 응급은 접수 이벤트를 거절하지 않고 항상 저장하며, 같은 환자의 진행 중 접수가 있으면 경고 로그만 남긴다 | patientId, sinceHours? |
 | UC-CARE-02 | POST | `/api/emergency/care/records` | 진료기록 | encounterId, content |
 | UC-CARE-03 | GET | `/api/emergency/care/treatments` | 접수 건별 처치기록(시행 시각 순) | receptionId |

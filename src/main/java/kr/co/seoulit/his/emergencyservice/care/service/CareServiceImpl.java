@@ -77,6 +77,8 @@ public class CareServiceImpl implements CareService {
                 .filter(intake -> !StringUtils.hasText(status) || status.equals(careStatus(intake, doneReceptionIds)))
                 .toList();
         List<String> receptionIds = intakes.stream().map(ReceptionIntake::getId).toList();
+        // 목록의 입원 배지(요청 대기·거부·배정 병동)용 — 최신 퇴실 결정과 가장 최근 입원요청을 한 번에 읽는다
+        Map<String, DischargeProgress.FollowUp> followUps = dischargeProgress.followUps(receptionIds);
 
         // 환자명은 더 이상 접수 데이터에 저장하지 않고, PAT 배치조회로 채운다.
         // N번 개별 호출하지 않도록 patientId를 모아서 한 번만 호출한다.
@@ -119,6 +121,12 @@ public class CareServiceImpl implements CareService {
                     dto.setCareStatusCode(careStatus(intake, doneReceptionIds));
                     dto.setMemo(intake.getMemo());
                     dto.setChiefComplaintRaw(intake.getChiefComplaintRaw());
+                    DischargeProgress.FollowUp followUp = followUps.get(intake.getId());
+                    if (followUp != null) {
+                        dto.setDispositionTypeCode(followUp.dispositionTypeCode());
+                        dto.setAdmissionStatusCode(followUp.admissionStatusCode());
+                        dto.setAssignedWardCode(followUp.assignedWardCode());
+                    }
 
                     // 오래된 순으로 가져왔으니 마지막이 최신 평가
                     List<TriageAssessment> history = triageByReception.getOrDefault(intake.getId(), List.of());
