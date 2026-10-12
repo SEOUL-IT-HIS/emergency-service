@@ -34,6 +34,15 @@ public class CommonCodeCacheLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        try {
+            load();
+        } finally {
+            // 성공·실패와 상관없이 적재 시도가 끝났음을 알린다(조회 API 가 그때까지는 "준비 중"으로 답한다)
+            commonCodeCache.markReady();
+        }
+    }
+
+    private void load() {
         List<AdminCommonCodeGroupDto> groups;
         try {
             groups = adminCommonCodeClient.getGroups();
