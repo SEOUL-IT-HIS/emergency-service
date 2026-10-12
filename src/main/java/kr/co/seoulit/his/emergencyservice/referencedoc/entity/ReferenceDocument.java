@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 응급 참고 문서 — 응급실 직원이 보는 프로토콜·지침·서식 파일의 목록(메타데이터).
  * 파일 본문은 DB가 아니라 SeaweedFS(S3) 버킷에 있고, 여기에는 찾아가는 키(OBJECT_KEY)만 둔다.
- * 환자·접수와 무관한 자료라 접수 ID 를 두지 않는다. 삭제는 DELETED_YN 상태 변경이다(행·파일은 남긴다).
+ * 환자·접수와 무관한 자료라 접수 ID 를 두지 않는다. 삭제는 DELETED_YN 상태 변경이다(행은 남기고 저장소의 파일 본문은 지운다).
  */
 @Entity
 @Table(schema = "EMERGENCY", name = "REFERENCE_DOCUMENT")

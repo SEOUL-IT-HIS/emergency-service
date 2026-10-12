@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 오접수·중복 접수 이벤트를 주기적으로 다시 보낸다. Kafka 발행이 켜져 있을 때만 돈다(app.kafka.void.enabled=true).
- * 끄려면 app.kafka.void.resend.enabled=false, 간격은 app.kafka.void.resend.interval-ms (기본 10분).
+ * 끄려면 app.kafka.void.resend.enabled=false, 간격은 app.kafka.void.resend.interval-ms (기본 30분).
  */
 @Slf4j
 @Component
@@ -23,7 +23,7 @@ public class ReceptionVoidResendScheduler {
     private boolean enabled;
 
     @Scheduled(initialDelayString = "${app.kafka.void.resend.initial-delay-ms:120000}",
-            fixedDelayString = "${app.kafka.void.resend.interval-ms:600000}")
+            fixedDelayString = "${app.kafka.void.resend.interval-ms:1800000}")
     public void resendPending() {
         if (!enabled) {
             return;

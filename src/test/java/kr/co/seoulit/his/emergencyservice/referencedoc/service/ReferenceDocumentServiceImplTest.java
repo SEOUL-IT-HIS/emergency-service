@@ -31,6 +31,7 @@ class ReferenceDocumentServiceImplTest {
         final Map<String, byte[]> objects = new HashMap<>();
         final Map<String, String> types = new HashMap<>();
         RuntimeException failOnPut;
+        RuntimeException failOnDelete;
 
         @Override
         public void put(String key, byte[] bytes, String contentType) {
@@ -52,6 +53,9 @@ class ReferenceDocumentServiceImplTest {
 
         @Override
         public void delete(String key) {
+            if (failOnDelete != null) {
+                throw failOnDelete;
+            }
             objects.remove(key);
         }
     }
@@ -234,7 +238,7 @@ class ReferenceDocumentServiceImplTest {
     }
 
     @Test
-    void deleteIsAStatusChangeAndKeepsRowAndFile() {
+    void deleteIsAStatusChangeThatKeepsTheRowButRemovesTheFile() {
         ReferenceDocument existing = doc("1", "t", null, "guide.pdf");
         when(repository.findByIdAndDeletedYn("1", "N")).thenReturn(Optional.of(existing));
         storage.objects.put(existing.getObjectKey(), new byte[]{1});
@@ -245,8 +249,23 @@ class ReferenceDocumentServiceImplTest {
         assertThat(existing.getDeletedById()).isEqualTo("emp-2");
         assertThat(existing.getDeletedAt()).isNotNull();
         verify(repository).save(existing);
+        // 행은 지우지 않는다(누가·언제 지웠는지 남긴다) — 저장소의 파일 본문만 지운다
         verify(repository, never()).delete(any(ReferenceDocument.class));
-        assertThat(storage.objects).containsKey(existing.getObjectKey());
+        assertThat(storage.objects).doesNotContainKey(existing.getObjectKey());
+    }
+
+    @Test
+    void deleteStillSucceedsWhenTheFileCannotBeRemovedFromStorage() {
+        ReferenceDocument existing = doc("1", "t", null, "guide.pdf");
+        when(repository.findByIdAndDeletedYn("1", "N")).thenReturn(Optional.of(existing));
+        storage.objects.put(existing.getObjectKey(), new byte[]{1});
+        storage.failOnDelete = new ExternalServiceException("Document storage is not responding.");
+
+        service.delete("1", "emp-2");
+
+        // 목록에서는 이미 빠졌다 — 저장소 오류는 사용자에게 돌려주지 않는다(남은 파일은 로그로만 알린다)
+        assertThat(existing.getDeletedYn()).isEqualTo("Y");
+        verify(repository).save(existing);
     }
 
     @Test

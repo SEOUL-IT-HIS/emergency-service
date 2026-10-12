@@ -12,7 +12,7 @@ import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.patient.client.PatientClient;
-import kr.co.seoulit.his.emergencyservice.patient.dto.PatientDto;
+import kr.co.seoulit.his.emergencyservice.patient.dto.PatientNames;
 import kr.co.seoulit.his.emergencyservice.resource.entity.BedAssignment;
 import kr.co.seoulit.his.emergencyservice.resource.repository.BedAssignmentRepository;
 import kr.co.seoulit.his.emergencyservice.triage.entity.TriageAssessment;
@@ -92,8 +92,8 @@ public class CareServiceImpl implements CareService {
         // 환자서비스가 응답하지 않아도 목록은 떠야 한다(이름만 비움). 예전엔 여기서 예외가 나 목록 전체가 500 이었다.
         Map<String, String> patientNames;
         try {
-            patientNames = patientClient.getPatients(patientIds).stream()
-                    .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName, (a, b) -> a));
+            // 이름이 없는 환자(임시·신원미상)가 섞여 있어도 나머지 이름은 그대로 채운다
+            patientNames = PatientNames.byId(patientClient.getPatients(patientIds));
         } catch (RuntimeException e) {
             log.warn("환자서비스 조회 실패 - 환자명 없이 목록을 내려줍니다: {}", e.getMessage());
             patientNames = Collections.emptyMap(); // Map.of() 는 get(null)(patientId 없는 접수)에서 예외가 나므로 쓰지 않는다

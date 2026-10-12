@@ -9,7 +9,7 @@ import kr.co.seoulit.his.emergencyservice.monitor.dto.*;
 import kr.co.seoulit.his.emergencyservice.monitor.entity.LosAlert;
 import kr.co.seoulit.his.emergencyservice.monitor.repository.LosAlertRepository;
 import kr.co.seoulit.his.emergencyservice.patient.client.PatientClient;
-import kr.co.seoulit.his.emergencyservice.patient.dto.PatientDto;
+import kr.co.seoulit.his.emergencyservice.patient.dto.PatientNames;
 import kr.co.seoulit.his.emergencyservice.resource.dto.CongestionMetricDto;
 import kr.co.seoulit.his.emergencyservice.resource.service.ResourceService;
 import lombok.RequiredArgsConstructor;
@@ -150,8 +150,8 @@ public class MonitorServiceImpl implements MonitorService {
         // 환자서비스가 응답하지 않아도 현황판은 떠야 한다(이름만 비움, 환자 목록과 같은 처리)
         Map<String, String> patientNames;
         try {
-            patientNames = patientClient.getPatients(patientIds).stream()
-                    .collect(Collectors.toMap(PatientDto::getPatientId, PatientDto::getPatientName, (a, b) -> a));
+            // 이름이 없는 환자(임시·신원미상)가 섞여 있어도 나머지 이름은 그대로 채운다
+            patientNames = PatientNames.byId(patientClient.getPatients(patientIds));
         } catch (RuntimeException e) {
             log.warn("환자서비스 조회 실패 - 환자명 없이 장기체류 알림을 내려줍니다: {}", e.getMessage());
             patientNames = Collections.emptyMap(); // Map.of() 는 get(null) 에서 예외가 나므로 쓰지 않는다
