@@ -62,7 +62,7 @@ public class ReferenceDocumentController {
                 .body(file.content());
     }
 
-    @Operation(summary = "참고 문서 삭제", description = "목록에서 뺀다(상태 변경 — 파일과 행은 남는다). deletedById 가 없으면 로그인 사용자")
+    @Operation(summary = "참고 문서 삭제", description = "목록에서 빼고 저장소의 파일 본문도 지운다(상태 변경 — 행은 남는다). deletedById 가 없으면 로그인 사용자")
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable String id, @RequestParam(required = false) String deletedById) {
         referenceDocumentService.delete(id, loginUser.chosenOrLogin(deletedById));

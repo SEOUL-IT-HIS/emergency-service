@@ -173,6 +173,14 @@ public class ReferenceDocumentServiceImpl implements ReferenceDocumentService {
         doc.setDeletedAt(now);
         doc.setUpdatedAt(now);
         repository.save(doc);
+        // 목록에서 빠진 뒤에도 저장소에 파일이 남으면 주소만 알아도 열린다 — 본문은 지운다(행은 누가·언제 지웠는지 남기려고 둔다).
+        // 파일 삭제가 실패해도 삭제는 이미 끝났으므로 오류로 돌려주지 않고 남은 파일을 로그로만 알린다(저장소 화면에서 지울 수 있다).
+        try {
+            storage.delete(doc.getObjectKey());
+        } catch (RuntimeException exception) {
+            log.warn("삭제한 참고 문서의 파일을 저장소에서 지우지 못했습니다(직접 지워야 합니다): key={}, 원인={}",
+                    doc.getObjectKey(), exception.getMessage());
+        }
     }
 
     private ReferenceDocument find(String id) {

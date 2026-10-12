@@ -15,6 +15,6 @@ public interface ReferenceDocumentService {
     /** 내려받을 파일(본문과 보여줄 이름·형식) */
     ReferenceDocumentFile getFile(String id);
 
-    /** 목록에서 뺀다(상태 변경 — 행과 저장소의 파일은 남긴다) */
+    /** 목록에서 빼고(상태 변경 — 행은 남긴다) 저장소의 파일 본문도 지운다 */
     void delete(String id, String deletedById);
 }

@@ -91,8 +91,8 @@ spring:
     import: optional:classpath:application-local.yml
   data:
     redis:
-      # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126
-      host: localhost
+      # 기본은 서버 안(localhost). 다른 곳을 보려면 환경변수 REDIS_HOST (개인 PC 개발 시: 192.168.1.126)
+      host: ${REDIS_HOST:localhost}
       port: 6379
       password: ${REDIS_PASSWORD:}
   datasource:
@@ -109,8 +109,10 @@ spring:
         format_sql: true
         default_schema: EMERGENCY
   kafka:
-    # 공용서버 배포 기준(localhost) — 개인 PC 개발 시: 192.168.1.126:9092
-    bootstrap-servers: localhost:9092
+    # 기본은 서버 안(localhost:9092). 팀 공용 브로커는 192.168.1.126:9092 이므로, 서버가 공용 브로커를 쓰려면
+    # 환경변수 KAFKA_BOOTSTRAP_SERVERS=192.168.1.126:9092 로 지정한다(개인 PC 는 application-local.yml 이 덮어쓴다).
+    # 서버가 켜질 때 어느 브로커에 붙었는지와 오접수 토픽 확인 결과를 로그로 남긴다(ReceptionVoidTopicCheck).
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: emergency-service
       auto-offset-reset: earliest

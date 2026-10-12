@@ -114,7 +114,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | ER-REF | GET | `/api/emergency/reference-documents` | 삭제되지 않은 문서 목록(올린 시각 최신순) | keyword(선택, 제목·분류·파일 이름) |
 | ER-REF | POST | `/api/emergency/reference-documents` | 문서 올리기 — `multipart/form-data`. 10MB 이하, 허용 형식 pdf·png·jpg·jpeg·gif·webp·txt·csv·doc(x)·xls(x)·ppt(x)·hwp(x), 그 밖은 400. 형식은 확장자로 판단하고 응답 형식도 서버가 정한다. 저장소가 응답하지 않거나 거부하면 502 | file(필수), title(없으면 파일 이름, 200자), category(선택, 50자), uploadedById(없으면 로그인 사용자) |
 | ER-REF | GET | `/api/emergency/reference-documents/{id}/file` | 파일 본문. pdf·이미지는 `inline`, 나머지는 `attachment`(`X-Content-Type-Options: nosniff`). 삭제됐거나 없으면 404 | id |
-| ER-REF | DELETE | `/api/emergency/reference-documents/{id}` | 목록에서 뺀다 — **상태 변경**(`DELETED_YN='Y'`), 행과 저장소의 파일은 남긴다 | deletedById(없으면 로그인 사용자) |
+| ER-REF | DELETE | `/api/emergency/reference-documents/{id}` | 목록에서 뺀다 — **상태 변경**(`DELETED_YN='Y'`, 행은 남김)하고 저장소의 파일 본문도 지운다(파일 삭제가 실패해도 삭제는 성공이고 경고 로그만 남김) | deletedById(없으면 로그인 사용자) |
 
 - **설정**(환경변수로만, 키는 코드·저장소에 두지 않는다): `SEAWEED_ENDPOINT`(기본 `http://localhost:8333` — 공용서버 안의 S3 게이트웨이, 프론트 `/files` 프록시와 같은 곳), `REFERENCE_DOC_BUCKET`(기본 `emergency-docs`), `SEAWEED_ACCESS_KEY`·`SEAWEED_SECRET_KEY`(S3 인증을 켜 둔 환경에서만 — 비우면 서명 없이 보낸다). 버킷이 없으면 첫 업로드 때 만들어 본다(키에 버킷 생성 권한이 없으면 관리자가 미리 만든다).
 - **DB**: `scripts/create-reference-document.sql`로 `REFERENCE_DOCUMENT` 테이블을 만든다(없으면 이 화면만 오류).
@@ -306,6 +306,8 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 | `reasonText` | 사유(500자 이내, 접수가 취소 상세 사유에 저장) |
 | `keptReceptionId` | 중복일 때 남기는 접수 ID(없으면 null — 접수는 연결 없이 사유 끝에 덧붙이기만 한다) |
 | `decidedBy` | 닫은 의사의 직원 ID(36자) |
+
+**접속 주소**: 응급 서버가 붙는 브로커는 `spring.kafka.bootstrap-servers`(환경변수 `KAFKA_BOOTSTRAP_SERVERS`, 기본 `localhost:9092`)이고 팀 공용 브로커는 `192.168.1.126:9092`다. 서버가 켜진 직후 어느 브로커에 붙었는지와 토픽 확인 결과를 로그 한 줄로 남긴다(`오접수 이벤트 토픽 확인: topic=…, 브로커=…, 파티션=…` 또는 경고). 토픽은 서버가 켜질 때 그 브로커에 만든다.
 
 **운영 전 결정할 것**: 이 토픽에 쓰는 권한을 응급 서비스로 제한할지(Kafka ACL). 브로커 관리자 소관이고 개발 단계는 제한하지 않는다.
 
