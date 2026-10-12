@@ -113,7 +113,7 @@ class ReceptionVoidMessagingTest {
         dispositions = mock(DispositionRepository.class);
         receptions = mock(ReceptionIntakeRepository.class);
         publisher = mock(ReceptionVoidPublisher.class);
-        resender = new ReceptionVoidResender(dispositions, receptions, publisher, 72, 2);
+        resender = new ReceptionVoidResender(dispositions, receptions, publisher, 24, 2);
     }
 
     private ReceptionIntake intake(String id, boolean cancelled) {
@@ -165,6 +165,19 @@ class ReceptionVoidMessagingTest {
 
         assertThat(resender.resendPending()).isZero();
         verify(publisher, times(0)).publishVoided(any());
+    }
+
+    @Test
+    void 결정한_지_최대_기간이_지난_건은_조회_대상에서_뺀다() {
+        when(dispositions.findByDispositionTypeCodeAndDecidedAtAfter(anyString(), any())).thenReturn(List.of());
+        LocalDateTime before = LocalDateTime.now();
+
+        resender.resendPending();
+
+        org.mockito.ArgumentCaptor<LocalDateTime> cutoff = org.mockito.ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(dispositions).findByDispositionTypeCodeAndDecidedAtAfter(eq("06"), cutoff.capture());
+        // 24시간 전(생성 시 넘긴 기간)보다 오래된 결정은 대상이 아니다
+        assertThat(cutoff.getValue()).isBetween(before.minusHours(24).minusSeconds(5), LocalDateTime.now().minusHours(24).plusSeconds(5));
     }
 
     @Test

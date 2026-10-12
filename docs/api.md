@@ -293,7 +293,7 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 응급이 퇴실 유형 `06`으로 접수를 닫으면 접수 서비스에 알린다(접수팀 합의 2026-10-08). 접수는 이 이벤트로만 타는 별도 경로로, 응급 기록·처방 유무를 따지지 않고 접수를 취소한 뒤 기존 `ReceptionCancelled`를 응급 토픽(`Emergency-patient-daily-list`)으로 보낸다. 응급은 그 취소 이벤트를 응급이 닫은 접수라면 기록이 있어도 받아들인다(`CANCELLABLE`).
 
 - 메시지 key: `receptionId`. 토픽은 응급이 서버가 켜질 때 만든다(`app.kafka.void.topic`, 파티션 1). 접수 컨슈머 그룹은 `reception-service.reception-voided-consumer`.
-- 발행은 DB 커밋 뒤이고 실패가 저장을 막지 않는다. 닫았는데 접수가 아직 취소하지 않은 건은 **10분마다 다시 보낸다**(`app.kafka.void.resend.*`, 결정한 지 2분 뒤부터 72시간까지, 새 `eventId`로). 접수는 같은 접수를 두 번 받아도 안전하게 처리한다(이미 취소된 접수는 그대로 둠).
+- 발행은 DB 커밋 뒤이고 실패가 저장을 막지 않는다. 닫았는데 접수가 아직 취소하지 않은 건은 **30분마다 다시 보낸다**(`app.kafka.void.resend.*`, 결정한 지 2분 뒤부터 24시간까지, 새 `eventId`로. 접수가 취소해 응급이 `ReceptionCancelled`를 받으면 멈춘다. 간격·기간·끄기는 설정값). 접수는 같은 접수를 두 번 받아도 안전하게 처리한다(이미 취소된 접수는 그대로 둠).
 
 | 필드 | 설명 |
 | --- | --- |

@@ -76,8 +76,8 @@ app:
       topic: emergency.reception.voided.v1
       resend:
         enabled: true
-        interval-ms: 600000
-        max-age-hours: 72
+        interval-ms: 1800000
+        max-age-hours: 24
 
 spring:
   application:
