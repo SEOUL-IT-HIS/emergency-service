@@ -113,6 +113,7 @@ public class CareServiceImpl implements CareService {
                 .map(intake -> {
                     EmergencyPatientDto dto = new EmergencyPatientDto();
                     dto.setReceptionId(intake.getId());
+                    dto.setPatientId(intake.getPatientId());
                     dto.setPatientName(names.get(intake.getPatientId()));
                     dto.setReceivedAt(intake.getReceivedAt());
                     dto.setCareStatusCode(careStatus(intake, doneReceptionIds));

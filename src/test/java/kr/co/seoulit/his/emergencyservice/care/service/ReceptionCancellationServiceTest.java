@@ -42,6 +42,7 @@ class ReceptionCancellationServiceTest {
     private ClinicalNoteRepository notes;
     private BedAssignmentRepository beds;
     private TriageAssessmentRepository triage;
+    private DispositionRepository dispositions;
     private OrderCoreClient orders;
     private ReceptionCancellationService service;
     private ReceptionIntake intake;
@@ -52,12 +53,13 @@ class ReceptionCancellationServiceTest {
         notes = mock(ClinicalNoteRepository.class);
         beds = mock(BedAssignmentRepository.class);
         triage = mock(TriageAssessmentRepository.class);
+        dispositions = mock(DispositionRepository.class);
         orders = mock(OrderCoreClient.class);
         service = new ReceptionCancellationService(receptions, notes, mock(TreatmentRecordRepository.class),
                 mock(MedicationAdministrationRepository.class), mock(CprEventRepository.class),
                 mock(ConsentRecordRepository.class), triage, mock(EwsRecordRepository.class),
                 mock(IsolationAssessmentRepository.class), mock(RiskScreeningRepository.class),
-                mock(EmsReferralRepository.class), beds, mock(DispositionRepository.class), orders);
+                mock(EmsReferralRepository.class), beds, dispositions, orders);
         intake = new ReceptionIntake();
         intake.setId("r-1");
         when(receptions.findById("r-1")).thenReturn(Optional.of(intake));
@@ -209,5 +211,47 @@ class ReceptionCancellationServiceTest {
 
         assertThat(service.check("r-1").isCancellable()).isTrue();
         assertThat(service.cancel("r-1", CANCELLED)).isEqualTo(Result.CANCELLED);
+    }
+
+    private kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition decision(String type) {
+        var d = new kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition();
+        d.setId("d-1");
+        d.setReceptionId("r-1");
+        d.setDispositionTypeCode(type);
+        d.setDecidedAt(LocalDateTime.now());
+        return d;
+    }
+
+    @Test
+    void 응급이_오접수로_닫은_접수는_기록과_처방이_있어도_취소를_받아들인다() {
+        when(dispositions.findByReceptionIdOrderByDecidedAtDesc("r-1")).thenReturn(List.of(decision("06")));
+        when(dispositions.existsByReceptionId("r-1")).thenReturn(true);
+        when(notes.existsByReceptionId("r-1")).thenReturn(true);
+        when(beds.existsByReceptionIdAndReleasedAtIsNull("r-1")).thenReturn(true);
+
+        assertThat(service.cancel("r-1", CANCELLED)).isEqualTo(Result.CANCELLED);
+
+        assertThat(intake.isCancelled()).isTrue();
+        verify(orders, never()).listByReception(any());   // 처방이 있는지는 따지지 않는다
+    }
+
+    @Test
+    void 응급이_오접수로_닫은_접수는_취소_가능_여부_조회도_가능으로_답한다() {
+        when(dispositions.findByReceptionIdOrderByDecidedAtDesc("r-1")).thenReturn(List.of(decision("06")));
+        when(notes.existsByReceptionId("r-1")).thenReturn(true);
+
+        ReceptionCancellableDto dto = service.check("r-1");
+
+        assertThat(dto.isCancellable()).isTrue();
+        assertThat(dto.getRecords()).contains("CLINICAL_NOTE");   // 기록 목록은 알림용으로만 돌려준다
+    }
+
+    @Test
+    void 오접수가_아닌_결정이_있으면_기록처럼_세어_거절한다() {
+        when(dispositions.findByReceptionIdOrderByDecidedAtDesc("r-1")).thenReturn(List.of(decision("01")));
+        when(dispositions.existsByReceptionId("r-1")).thenReturn(true);
+
+        assertThat(service.cancel("r-1", CANCELLED)).isEqualTo(Result.REFUSED_HAS_RECORDS);
+        assertThat(intake.isCancelled()).isFalse();
     }
 }

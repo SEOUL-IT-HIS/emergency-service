@@ -4,7 +4,9 @@ import kr.co.seoulit.his.emergencyservice.common.exception.ConflictException;
 import kr.co.seoulit.his.emergencyservice.common.exception.ResourceNotFoundException;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeCache;
 import kr.co.seoulit.his.emergencyservice.commoncode.CommonCodeResolver;
+import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.messaging.AdmissionEventPublisher;
+import kr.co.seoulit.his.emergencyservice.disposition.messaging.ReceptionVoidPublisher;
 import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.commoncode.dto.AdminCommonCodeItemDto;
 import kr.co.seoulit.his.emergencyservice.disposition.dto.*;
@@ -37,6 +39,8 @@ public class DispositionServiceImpl implements DispositionService {
     private final AdmissionEventPublisher admissionEventPublisher;
     private final DischargeProgress dischargeProgress;
     private final ResourceService resourceService;
+    private final ReceptionIntakeRepository receptionIntakeRepository;
+    private final ReceptionVoidPublisher receptionVoidPublisher;
 
     @Override
     @Transactional
@@ -48,6 +52,8 @@ public class DispositionServiceImpl implements DispositionService {
         if (!validTypes.contains(request.getDispositionType())) {
             throw new IllegalArgumentException("dispositionType must be one of " + String.join(", ", validTypes));
         }
+        boolean voiding = EmgCodes.DISPOSITION_VOID.equals(request.getDispositionType());
+        VoidInfo voidInfo = voiding ? validateVoid(request) : null;
         // 이미 결정이 있으면 '결정 변경'이다. 후속 조치 전(OPEN: 입원요청 없음·거부됨, 전원 소견서 없음)일 때만 허용한다.
         // 퇴실 처리가 끝났거나(DONE) 병동 회신을 기다리는 중(WAITING_WARD)이면 바꿀 수 없다. 이력은 새 행으로 쌓이고 최신 결정이 적용된다.
         DischargeProgress.Stage stage = dischargeProgress.stage(request.getEncounterId());
@@ -68,13 +74,60 @@ public class DispositionServiceImpl implements DispositionService {
         entity.setDecidedAt(LocalDateTime.now());
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        DispositionDto dto = toDispositionDto(dispositionRepository.save(entity));
+        if (voidInfo != null) {
+            entity.setVoidReasonTypeCode(voidInfo.reasonType());
+            entity.setVoidReason(voidInfo.reason());
+            entity.setKeptReceptionId(voidInfo.keptReceptionId());
+        }
+        Disposition saved = dispositionRepository.save(entity);
+        DispositionDto dto = toDispositionDto(saved);
+        if (voiding) {
+            // 접수 서비스에 알린다(접수가 접수를 취소 처리한다). 커밋 뒤에 보내고, 실패는 저장을 막지 않으며 주기적으로 다시 보낸다.
+            runAfterCommit(() -> receptionVoidPublisher.publishVoided(saved));
+        }
         DischargeProgress.Stage stageAfter = releaseBedsIfDischarged(entity.getReceptionId());
         dto.setStage(stageAfter == null ? null : stageAfter.name());
         // 새 결정은 후속 조치가 없으니 입원·전원이면 아직 바꿀 수 있다(귀가·사망·자의퇴원은 즉시 완료)
         dto.setChangeable(EmgCodes.DISPOSITION_ADMIT.equals(entity.getDispositionTypeCode())
                 || EmgCodes.DISPOSITION_TRANSFER.equals(entity.getDispositionTypeCode()));
         return dto;
+    }
+
+    /** 오접수·중복 접수(06)로 닫을 때 받는 사유 — 검증을 통과한 값 */
+    private record VoidInfo(String reasonType, String reason, String keptReceptionId) {
+    }
+
+    /**
+     * 오접수·중복 접수(06): 사유 유형(DUPLICATE/ERRONEOUS)과 사유(500자 이내)가 필수다. 남기는 접수 ID 는 중복일 때만 줄 수 있고,
+     * 이 접수가 아니어야 하며 응급에 있는 접수여야 한다. 이미 취소된 접수는 닫을 필요가 없어 409 로 막는다.
+     */
+    private VoidInfo validateVoid(DispositionCreateRequestDto request) {
+        String reasonType = request.getVoidReasonType() == null ? null : request.getVoidReasonType().trim();
+        if (!EmgCodes.VOID_REASON_DUPLICATE.equals(reasonType) && !EmgCodes.VOID_REASON_ERRONEOUS.equals(reasonType)) {
+            throw new IllegalArgumentException("voidReasonType must be " + EmgCodes.VOID_REASON_DUPLICATE + " or "
+                    + EmgCodes.VOID_REASON_ERRONEOUS + " for dispositionType " + EmgCodes.DISPOSITION_VOID);
+        }
+        String reason = request.getVoidReason() == null ? null : request.getVoidReason().trim();
+        if (!StringUtils.hasText(reason)) {
+            throw new IllegalArgumentException("voidReason is required for dispositionType " + EmgCodes.DISPOSITION_VOID);
+        }
+        if (reason.length() > EmgCodes.VOID_REASON_MAX_LENGTH) {
+            throw new IllegalArgumentException("voidReason must be at most " + EmgCodes.VOID_REASON_MAX_LENGTH + " characters");
+        }
+        String kept = StringUtils.hasText(request.getKeptReceptionId()) ? request.getKeptReceptionId().trim() : null;
+        if (kept != null) {
+            if (!EmgCodes.VOID_REASON_DUPLICATE.equals(reasonType)) {
+                throw new IllegalArgumentException("keptReceptionId is only for voidReasonType " + EmgCodes.VOID_REASON_DUPLICATE);
+            }
+            if (kept.equals(request.getEncounterId())) {
+                throw new IllegalArgumentException("keptReceptionId must be a different reception");
+            }
+            if (!receptionIntakeRepository.existsById(kept)) {
+                throw new IllegalArgumentException("keptReceptionId not found: " + kept);
+            }
+        }
+        dischargeProgress.requireNotCancelled(request.getEncounterId());
+        return new VoidInfo(reasonType, reason, kept);
     }
 
     @Override
@@ -318,6 +371,9 @@ public class DispositionServiceImpl implements DispositionService {
         dto.setDispositionTypeCode(entity.getDispositionTypeCode());
         dto.setDecidedById(entity.getDecidedById());
         dto.setDecidedAt(entity.getDecidedAt());
+        dto.setVoidReasonType(entity.getVoidReasonTypeCode());
+        dto.setVoidReason(entity.getVoidReason());
+        dto.setKeptReceptionId(entity.getKeptReceptionId());
         return dto;
     }
 }

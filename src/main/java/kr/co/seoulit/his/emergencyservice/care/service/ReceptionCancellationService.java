@@ -8,6 +8,7 @@ import kr.co.seoulit.his.emergencyservice.care.repository.CprEventRepository;
 import kr.co.seoulit.his.emergencyservice.care.repository.MedicationAdministrationRepository;
 import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
 import kr.co.seoulit.his.emergencyservice.care.repository.TreatmentRecordRepository;
+import kr.co.seoulit.his.emergencyservice.commoncode.EmgCodes;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
 import kr.co.seoulit.his.emergencyservice.order.client.OrderCoreClient;
 import kr.co.seoulit.his.emergencyservice.resource.repository.BedAssignmentRepository;
@@ -118,6 +119,11 @@ public class ReceptionCancellationService {
             return new Evaluation(Verdict.ALREADY_CANCELLED, intake, List.of());
         }
         List<String> records = recordsOf(receptionId);
+        // 응급이 오접수·중복 접수(06)로 직접 닫은 접수는 기록이 있어도 취소를 받아들인다 — 접수가 응급의 알림(ReceptionVoided)을 받아
+        // 취소하는 것이므로 기록·처방이 있는지 따지지 않는다. 기록 목록은 알림용으로만 돌려준다.
+        if (closedAsVoid(receptionId)) {
+            return new Evaluation(Verdict.CANCELLABLE, intake, records);
+        }
         if (!records.isEmpty()) {
             return new Evaluation(Verdict.HAS_RECORDS, intake, records);
         }
@@ -133,6 +139,12 @@ public class ReceptionCancellationService {
     }
 
     private static final String RECORD_ORDER = "ORDER";
+
+    /** 최신 퇴실 결정이 오접수·중복 접수(06)인지 — 06 은 최종 결정이라 바뀌지 않는다 */
+    private boolean closedAsVoid(String receptionId) {
+        return dispositionRepository.findByReceptionIdOrderByDecidedAtDesc(receptionId).stream().findFirst()
+                .map(d -> EmgCodes.DISPOSITION_VOID.equals(d.getDispositionTypeCode())).orElse(false);
+    }
 
     /**
      * 사람이 남긴 진료 기록의 종류(응급 DB 기준, 처방은 따로 본다). 접수가 넣어준 KTAS(RECEPTION)·자동 알림·해제한 병상 배정은 기록으로 보지 않는다.

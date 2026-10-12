@@ -47,6 +47,17 @@ app:
   pharmacy:
     # 약제(PHM) 서비스 base-url — 조제 상태 조회(GET /api/pharmacy/prescriptions?prescriptionId=)에 쓴다. 개인 PC 개발 시 application-local.yml 에서 덮어쓴다(개발 서버 http://192.168.1.125:8082)
     base-url: ${PHARMACY_BASE_URL:http://localhost:8082}
+  reference-doc:
+    # 응급 참고 문서 라이브러리(프로토콜·지침·서식 파일). 본문은 SeaweedFS S3 버킷, 목록은 응급 DB(REFERENCE_DOCUMENT)
+    max-file-size-mb: 10
+    storage:
+      # SeaweedFS S3 게이트웨이. 공용서버 안에서는 localhost:8333 (프론트 /files 프록시와 같은 곳). 개인 PC 에서는 application-local.yml 로 덮어쓴다
+      endpoint: ${SEAWEED_ENDPOINT:http://localhost:8333}
+      bucket: ${REFERENCE_DOC_BUCKET:emergency-docs}
+      region: us-east-1
+      # S3 인증을 켜 둔 환경에서만 넣는다(환경변수로만 — 코드·저장소에 두지 않는다). 비우면 서명 없이 보낸다
+      access-key: ${SEAWEED_ACCESS_KEY:}
+      secret-key: ${SEAWEED_SECRET_KEY:}
   kafka:
     # 접수 이벤트 수신(Emergency-patient-daily-list 구독). 접수 연동을 켤 때만 true
     intake:
@@ -58,10 +69,24 @@ app:
     # inpatient.admission.bed-assigned.v1 / inpatient.admission.rejected.v1 (app.kafka.admission.*-topic 으로 변경 가능)
     admission:
       enabled: true
+    # 오접수·중복 접수(퇴실 유형 06)로 닫은 사실을 접수 서비스에 알리는 이벤트(응급→접수, 접수팀 합의 2026-10-08). 토픽은 응급이 만든다.
+    # 닫았는데 접수가 아직 취소하지 않은 건은 resend 가 주기적으로 다시 보낸다(접수는 중복 이벤트에 안전). 끄려면 enabled: false
+    void:
+      enabled: true
+      topic: emergency.reception.voided.v1
+      resend:
+        enabled: true
+        interval-ms: 600000
+        max-age-hours: 72
 
 spring:
   application:
     name: emergency-service
+  servlet:
+    multipart:
+      # 참고 문서 업로드(기본 1MB 로는 PDF 도 못 올린다). app.reference-doc.max-file-size-mb 와 맞춘다
+      max-file-size: 10MB
+      max-request-size: 11MB
   config:
     import: optional:classpath:application-local.yml
   data:

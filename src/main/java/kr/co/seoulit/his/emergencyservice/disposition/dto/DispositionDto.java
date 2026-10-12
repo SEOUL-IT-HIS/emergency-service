@@ -12,6 +12,10 @@ public class DispositionDto {
     private String dispositionTypeCode;
     private String decidedById;
     private LocalDateTime decidedAt;
+    /** 오접수·중복 접수(06)일 때만 채워진다 */
+    private String voidReasonType;
+    private String voidReason;
+    private String keptReceptionId;
     /** 이 결정을 다른 유형으로 바꿀 수 있는지(최신 결정이고 후속 조치 전일 때만 true) */
     private boolean changeable;
     /**

@@ -13,6 +13,9 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * 응급 도메인 예외 처리 — starter AuthExceptionHandler 패턴 준용
@@ -48,6 +51,24 @@ public class EmergencyExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleMissingParameter(MissingServletRequestParameterException exception) {
         return ApiResponse.error("EMG_BAD_REQUEST", exception.getParameterName() + " is required");
+    }
+
+    // 파일 업로드(참고 문서) — 필수 파트(file) 누락
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingPart(MissingServletRequestPartException exception) {
+        return ApiResponse.error("EMG_BAD_REQUEST", exception.getRequestPartName() + " is required");
+    }
+
+    // 파일 업로드 — 크기 초과(spring.servlet.multipart.max-file-size)·multipart 가 아닌 요청. 없으면 500으로 떨어짐
+    @ExceptionHandler(MultipartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMultipart(MultipartException exception) {
+        if (exception instanceof MaxUploadSizeExceededException) {
+            // 파일이 너무 큽니다.
+            return ApiResponse.error("EMG_BAD_REQUEST", "file is too large");
+        }
+        return ApiResponse.error("EMG_BAD_REQUEST", "multipart/form-data request is required");
     }
 
     @ExceptionHandler(UnauthenticatedException.class)
