@@ -98,12 +98,27 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 | UC | Method | Endpoint | 설명 | 필수 파라미터 |
 | --- | --- | --- | --- | --- |
-| UC-DISP-01 | POST | `/api/emergency/dispositions` | 퇴실 결정. 이미 결정이 있으면 '결정 변경'(새 행 추가, 최신 결정 적용) — 후속 조치 전(입원요청 없음·거부됨, 전원 소견서 없음)일 때만 허용, 병동 회신 대기 중·퇴실 완료면 409, 같은 유형으로 다시 결정하면 400 | encounterId, dispositionType |
+| UC-DISP-01 | POST | `/api/emergency/dispositions` | 퇴실 결정. 이미 결정이 있으면 '결정 변경'(새 행 추가, 최신 결정 적용) — 후속 조치 전(입원요청 없음·거부됨, 전원 소견서 없음)일 때만 허용, 병동 회신 대기 중·퇴실 완료면 409, 같은 유형으로 다시 결정하면 400. **유형 `06` 오접수·중복 접수**는 사유가 필수이고(`voidReasonType` DUPLICATE/ERRONEOUS, `voidReason` 500자 이내, 중복일 때만 `keptReceptionId` 선택 — 다른 접수여야 하고 응급에 있어야 함, 아니면 400) 이미 취소된 접수는 409, 저장 뒤 접수 서비스에 `ReceptionVoided` 이벤트를 보낸다(6-2장). 06 은 최종 결정이라 바꿀 수 없다(퇴실 완료와 같은 DONE). 06 이 아닌 유형이 보낸 사유 필드는 무시한다 | encounterId, dispositionType, decidedById, (06 일 때) voidReasonType, voidReason, keptReceptionId |
 | UC-DISP-01 | GET | `/api/emergency/dispositions` | 접수 건별 퇴실 결정 이력(최신이 첫 번째). `changeable`: 최신 결정을 바꿀 수 있는지 | receptionId |
 | UC-DISP-02 | GET | `/api/emergency/dispositions/{id}/admission-requests` | 입원요청 이력(최신이 첫 번째). 상태(`requestStatusCode` 01 요청됨 / 02 병상 배정 완료 / 03 거부)는 병동 회신(Kafka)으로 갱신, 처음 회신만 반영. `assignedWardCode`: 병동이 실제 배정한 병동(WARD_CD, 02일 때만 값) | id |
 | UC-DISP-02 | POST | `/api/emergency/dispositions/{id}/admission-request` | 입원 요청(최신 퇴실 결정이 입원일 때만 — 바뀐 이전 결정이면 409, 요청됨·배정 완료 상태가 있으면 409, note 500자 이하, DB 커밋 뒤 병동으로 Kafka 발행) | id, targetDeptCode?(DEPT_CD), wardPrefer?(WARD_CD), note? |
 | UC-DISP-03 | GET | `/api/emergency/dispositions/{id}/transfer-notes` | 전원 소견서 목록(최신이 첫 번째) | id |
 | UC-DISP-03 | POST | `/api/emergency/dispositions/{id}/transfer-note` | 전원 소견서(최신 퇴실 결정이 전원일 때만 — 바뀐 이전 결정이면 409) | id, targetHospitalCode, content, writtenById |
+
+### 2.8 ER-REF 응급 참고 문서 (응급 전용, 환자와 무관)
+
+응급 직원이 찾아 보는 프로토콜·지침·서식 파일 라이브러리. 파일 본문은 SeaweedFS(S3) 버킷에, 목록(제목·분류·올린 사람)은 응급 DB `REFERENCE_DOCUMENT`에 둔다. 처방·검사·약제 결과를 저장하는 곳이 아니며 다른 서비스를 호출하지 않는다.
+
+| 구분 | Method | Endpoint | 설명 | 주요 파라미터 |
+| --- | --- | --- | --- | --- |
+| ER-REF | GET | `/api/emergency/reference-documents` | 삭제되지 않은 문서 목록(올린 시각 최신순) | keyword(선택, 제목·분류·파일 이름) |
+| ER-REF | POST | `/api/emergency/reference-documents` | 문서 올리기 — `multipart/form-data`. 10MB 이하, 허용 형식 pdf·png·jpg·jpeg·gif·webp·txt·csv·doc(x)·xls(x)·ppt(x)·hwp(x), 그 밖은 400. 형식은 확장자로 판단하고 응답 형식도 서버가 정한다. 저장소가 응답하지 않거나 거부하면 502 | file(필수), title(없으면 파일 이름, 200자), category(선택, 50자), uploadedById(없으면 로그인 사용자) |
+| ER-REF | GET | `/api/emergency/reference-documents/{id}/file` | 파일 본문. pdf·이미지는 `inline`, 나머지는 `attachment`(`X-Content-Type-Options: nosniff`). 삭제됐거나 없으면 404 | id |
+| ER-REF | DELETE | `/api/emergency/reference-documents/{id}` | 목록에서 뺀다 — **상태 변경**(`DELETED_YN='Y'`), 행과 저장소의 파일은 남긴다 | deletedById(없으면 로그인 사용자) |
+
+- **설정**(환경변수로만, 키는 코드·저장소에 두지 않는다): `SEAWEED_ENDPOINT`(기본 `http://localhost:8333` — 공용서버 안의 S3 게이트웨이, 프론트 `/files` 프록시와 같은 곳), `REFERENCE_DOC_BUCKET`(기본 `emergency-docs`), `SEAWEED_ACCESS_KEY`·`SEAWEED_SECRET_KEY`(S3 인증을 켜 둔 환경에서만 — 비우면 서명 없이 보낸다). 버킷이 없으면 첫 업로드 때 만들어 본다(키에 버킷 생성 권한이 없으면 관리자가 미리 만든다).
+- **DB**: `scripts/create-reference-document.sql`로 `REFERENCE_DOCUMENT` 테이블을 만든다(없으면 이 화면만 오류).
+- 파일 크기 한도는 `spring.servlet.multipart.max-file-size`(10MB)와 `app.reference-doc.max-file-size-mb`가 같아야 한다.
 
 ### 2.7 ER-CODE (응급 전용)
 
@@ -265,13 +280,36 @@ Swagger UI: `http://localhost:8089/swagger-ui.html` (코드 기반 자동 생성
 
 | reasonCode | cancellable | 의미 |
 | --- | --- | --- |
-| `CANCELLABLE` | true | 진료 기록 없음 — 취소 이벤트를 받으면 취소한다 |
+| `CANCELLABLE` | true | 진료 기록 없음 — 취소 이벤트를 받으면 취소한다. **응급이 오접수·중복 접수(06)로 직접 닫은 접수**는 기록이 있어도 이 값이다(`records`는 알림용으로만 채워진다) |
 | `ALREADY_CANCELLED` | true | 이미 취소된 접수 |
 | `NOT_FOUND` | true | 응급에 없는 접수(응급은 건너뛴다) |
 | `HAS_RECORDS` | false | 진료 기록이 있다 — 취소 이벤트를 받아도 응급은 취소하지 않는다. `records`에 종류 |
 | `CANNOT_VERIFY` | false | 처방코어에서 처방 여부를 확인하지 못했다 — 잠시 뒤 다시 조회 |
 
 `records` 값: `CLINICAL_NOTE`(진료기록) · `TREATMENT`(처치) · `MEDICATION`(투약) · `CPR` · `CONSENT`(동의) · `KTAS`(직원이 입력한 KTAS) · `VITAL_SIGNS`(활력징후) · `ISOLATION`(격리) · `RISK_SCREENING` · `EMS_REFERRAL` · `BED_ASSIGNMENT`(지금 배정 중인 병상. 해제한 배정은 제외) · `DISPOSITION`(퇴실 결정) · `ORDER`(처방코어 처방). 접수가 넣어준 KTAS는 기록으로 보지 않는다. `receptionId`가 비면 400. 로그인 검사(`app.auth.required`)에서 제외한다(서버끼리 호출).
+
+### 6-2. 오접수·중복 접수 이벤트(응급 → 접수) — 토픽 `emergency.reception.voided.v1`
+
+응급이 퇴실 유형 `06`으로 접수를 닫으면 접수 서비스에 알린다(접수팀 합의 2026-10-08). 접수는 이 이벤트로만 타는 별도 경로로, 응급 기록·처방 유무를 따지지 않고 접수를 취소한 뒤 기존 `ReceptionCancelled`를 응급 토픽(`Emergency-patient-daily-list`)으로 보낸다. 응급은 그 취소 이벤트를 응급이 닫은 접수라면 기록이 있어도 받아들인다(`CANCELLABLE`).
+
+- 메시지 key: `receptionId`. 토픽은 응급이 서버가 켜질 때 만든다(`app.kafka.void.topic`, 파티션 1). 접수 컨슈머 그룹은 `reception-service.reception-voided-consumer`.
+- 발행은 DB 커밋 뒤이고 실패가 저장을 막지 않는다. 닫았는데 접수가 아직 취소하지 않은 건은 **10분마다 다시 보낸다**(`app.kafka.void.resend.*`, 결정한 지 2분 뒤부터 72시간까지, 새 `eventId`로). 접수는 같은 접수를 두 번 받아도 안전하게 처리한다(이미 취소된 접수는 그대로 둠).
+
+| 필드 | 설명 |
+| --- | --- |
+| `eventId` | UUID(재전송할 때마다 새로) |
+| `eventType` | `"ReceptionVoided"` |
+| `version` / `source` | `"1.0"` / `"ER"` |
+| `occurredAt` | 응급이 닫은(결정한) 시각 — ISO-8601 오프셋 포함, 초 단위(예: `2026-10-08T14:30:00+09:00`). 재전송해도 같다 |
+| `receptionId` / `patientId` | 접수 ID / 환자 ID |
+| `reasonType` | `DUPLICATE`(중복 접수 → 접수 사유 코드 `DUPLICATE`) / `ERRONEOUS`(접수 오류 → `MISTAKE`) |
+| `reasonText` | 사유(500자 이내, 접수가 취소 상세 사유에 저장) |
+| `keptReceptionId` | 중복일 때 남기는 접수 ID(없으면 null — 접수는 연결 없이 사유 끝에 덧붙이기만 한다) |
+| `decidedBy` | 닫은 의사의 직원 ID(36자) |
+
+**운영 전 결정할 것**: 이 토픽에 쓰는 권한을 응급 서비스로 제한할지(Kafka ACL). 브로커 관리자 소관이고 개발 단계는 제한하지 않는다.
+
+**DB**: `DISPOSITION`에 `VOID_REASON_TYPE_CODE`·`VOID_REASON`·`KEPT_RECEPTION_ID` 컬럼 추가(`scripts/alter-disposition-add-void-reason.sql` — 새 코드를 띄우기 전에 실행). **공통코드**: admin 그룹 `ER_DISPOSITION_TYPE_CD`에 `06`이 추가돼야 화면에 보이고 서버가 받는다.
 
 ---
 

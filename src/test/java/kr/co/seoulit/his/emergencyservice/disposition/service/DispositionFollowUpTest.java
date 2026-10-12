@@ -14,7 +14,9 @@ import kr.co.seoulit.his.emergencyservice.disposition.entity.Disposition;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.AdmissionRequestRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.DispositionRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.repository.TransferNoteRepository;
+import kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository;
 import kr.co.seoulit.his.emergencyservice.disposition.messaging.AdmissionEventPublisher;
+import kr.co.seoulit.his.emergencyservice.disposition.messaging.ReceptionVoidPublisher;
 import kr.co.seoulit.his.emergencyservice.disposition.entity.TransferNote;
 import kr.co.seoulit.his.emergencyservice.resource.service.ResourceService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +41,8 @@ class DispositionFollowUpTest {
     private DispositionServiceImpl service;
     private AdmissionEventPublisher publisher;
     private ResourceService resourceService;
+    private ReceptionIntakeRepository receptionIntakeRepository;
+    private ReceptionVoidPublisher voidPublisher;
 
     @BeforeEach
     void setUp() {
@@ -58,11 +62,13 @@ class DispositionFollowUpTest {
         CommonCodeCache cache = new CommonCodeCache();
         publisher = mock(AdmissionEventPublisher.class);
         resourceService = mock(ResourceService.class);
+        receptionIntakeRepository = mock(ReceptionIntakeRepository.class);
+        voidPublisher = mock(ReceptionVoidPublisher.class);
         service = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
                 transferNoteRepository, cache, new CommonCodeResolver(cache), publisher,
                 new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository,
                         org.mockito.Mockito.mock(kr.co.seoulit.his.emergencyservice.care.repository.ReceptionIntakeRepository.class)),
-                resourceService);
+                resourceService, receptionIntakeRepository, voidPublisher);
     }
 
     private Disposition disposition(String id, String typeCode) {
@@ -345,5 +351,112 @@ class DispositionFollowUpTest {
         assertThat(service.getDispositions("r-1").get(0).getStage()).isEqualTo("DONE");
         decided(EmgCodes.DISPOSITION_ADMIT, request(null, EmgCodes.ADMISSION_REJECTED));
         assertThat(service.getDispositions("r-1").get(0).getStage()).isEqualTo("OPEN");
+    }
+
+    // ---------------------------------------------------------------- 오접수·중복 접수(06)
+
+    private DispositionCreateRequestDto decideVoid(String reasonType, String reason, String kept) {
+        DispositionCreateRequestDto req = decide(EmgCodes.DISPOSITION_VOID);
+        req.setVoidReasonType(reasonType);
+        req.setVoidReason(reason);
+        req.setKeptReceptionId(kept);
+        return req;
+    }
+
+    @Test
+    void closingAsVoidNeedsAReasonTypeAndAReasonAndNeverNotifiesOnFailure() {
+        assertThatThrownBy(() -> service.createDisposition(decideVoid(null, "dup", null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("voidReasonType");
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("WHATEVER", "dup", null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("voidReasonType");
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("DUPLICATE", "  ", null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("voidReason is required");
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("DUPLICATE", "x".repeat(501), null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("at most 500");
+
+        org.mockito.Mockito.verifyNoInteractions(voidPublisher);
+        org.mockito.Mockito.verify(dispositionRepository, org.mockito.Mockito.never()).save(any(Disposition.class));
+    }
+
+    @Test
+    void closingAsVoidSavesTheReasonAndNotifiesTheReception() {
+        when(receptionIntakeRepository.existsById("r-keep")).thenReturn(true);
+
+        DispositionDto dto = service.createDisposition(decideVoid(" DUPLICATE ", "  같은 환자를 두 번 접수  ", " r-keep "));
+
+        assertThat(dto.getDispositionTypeCode()).isEqualTo(EmgCodes.DISPOSITION_VOID);
+        assertThat(dto.getVoidReasonType()).isEqualTo("DUPLICATE");
+        assertThat(dto.getVoidReason()).isEqualTo("같은 환자를 두 번 접수");     // 앞뒤 공백은 뗀다
+        assertThat(dto.getKeptReceptionId()).isEqualTo("r-keep");
+        assertThat(dto.isChangeable()).isFalse();                                // 06 은 최종 결정이다
+        org.mockito.ArgumentCaptor<Disposition> sent = org.mockito.ArgumentCaptor.forClass(Disposition.class);
+        org.mockito.Mockito.verify(voidPublisher).publishVoided(sent.capture());
+        assertThat(sent.getValue().getReceptionId()).isEqualTo("r-1");
+        assertThat(sent.getValue().getVoidReasonTypeCode()).isEqualTo("DUPLICATE");
+    }
+
+    @Test
+    void anErroneousReceptionNeedsNoKeptReceptionAndRejectsOne() {
+        DispositionDto dto = service.createDisposition(decideVoid("ERRONEOUS", "접수 입력 실수", null));
+        assertThat(dto.getVoidReasonType()).isEqualTo("ERRONEOUS");
+        assertThat(dto.getKeptReceptionId()).isNull();
+
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("ERRONEOUS", "실수", "r-keep")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only for");
+    }
+
+    @Test
+    void theKeptReceptionMustBeAnotherKnownReception() {
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("DUPLICATE", "중복", "r-1")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("different reception");
+        assertThatThrownBy(() -> service.createDisposition(decideVoid("DUPLICATE", "중복", "r-none")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("not found");
+        org.mockito.Mockito.verifyNoInteractions(voidPublisher);
+    }
+
+    @Test
+    void voidFieldsAreIgnoredForOtherDispositionTypes() {
+        DispositionCreateRequestDto req = decide(EmgCodes.DISPOSITION_HOME);
+        req.setVoidReasonType("DUPLICATE");
+        req.setVoidReason("무시되어야 한다");
+        req.setKeptReceptionId("r-keep");
+
+        DispositionDto dto = service.createDisposition(req);
+
+        assertThat(dto.getVoidReasonType()).isNull();
+        assertThat(dto.getVoidReason()).isNull();
+        assertThat(dto.getKeptReceptionId()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(voidPublisher);
+    }
+
+    @Test
+    void aReceptionAlreadyCancelledAtReceptionCannotBeClosedAsVoid() {
+        kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake cancelled =
+                new kr.co.seoulit.his.emergencyservice.care.entity.ReceptionIntake();
+        cancelled.setId("r-1");
+        cancelled.setCancelledAt(LocalDateTime.now());
+        ReceptionIntakeRepository intakes = mock(ReceptionIntakeRepository.class);
+        when(intakes.findById("r-1")).thenReturn(Optional.of(cancelled));
+        DispositionServiceImpl withCancelled = new DispositionServiceImpl(dispositionRepository, admissionRequestRepository,
+                transferNoteRepository, new CommonCodeCache(), new CommonCodeResolver(new CommonCodeCache()), publisher,
+                new DischargeProgress(dispositionRepository, admissionRequestRepository, transferNoteRepository, intakes),
+                resourceService, receptionIntakeRepository, voidPublisher);
+
+        assertThatThrownBy(() -> withCancelled.createDisposition(decideVoid("ERRONEOUS", "실수", null)))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("cancelled");
+        org.mockito.Mockito.verifyNoInteractions(voidPublisher);
+    }
+
+    @Test
+    void aVoidDecisionIsFinalAndCannotBeChanged() {
+        Disposition voided = new Disposition();
+        voided.setId("d-void");
+        voided.setReceptionId("r-1");
+        voided.setDispositionTypeCode(EmgCodes.DISPOSITION_VOID);
+        voided.setDecidedAt(LocalDateTime.now());
+        when(dispositionRepository.findByReceptionIdIn(any())).thenReturn(List.of(voided));
+
+        assertThatThrownBy(() -> service.createDisposition(decide(EmgCodes.DISPOSITION_HOME)))
+                .isInstanceOf(ConflictException.class);
     }
 }

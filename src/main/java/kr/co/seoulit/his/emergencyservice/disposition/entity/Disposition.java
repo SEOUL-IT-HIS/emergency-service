@@ -30,6 +30,16 @@ public class Disposition {
     @Column(name = "DECIDED_AT")
     private LocalDateTime decidedAt;
 
+    /** 오접수·중복 접수(06)일 때만: 사유 유형(DUPLICATE / ERRONEOUS), 사유, 중복일 때 남기는 접수 ID */
+    @Column(name = "VOID_REASON_TYPE_CODE", length = 20)
+    private String voidReasonTypeCode;
+
+    @Column(name = "VOID_REASON", length = 500)
+    private String voidReason;
+
+    @Column(name = "KEPT_RECEPTION_ID", length = 36)
+    private String keptReceptionId;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;
 

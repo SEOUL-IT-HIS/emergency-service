@@ -21,6 +21,7 @@ class EmergencyServiceApplicationTests {
         // 컨텍스트가 뜨는지만 보는 테스트이므로 Kafka 연동은 끈다.
         registry.add("app.kafka.intake.enabled", () -> "false");
         registry.add("app.kafka.admission.enabled", () -> "false");
+        registry.add("app.kafka.void.enabled", () -> "false");
     }
 
     @Test

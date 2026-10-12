@@ -74,8 +74,15 @@ public final class EmgCodes {
     public static final String DISPOSITION_TRANSFER = "03";
     public static final String DISPOSITION_DEATH = "04";
     public static final String DISPOSITION_DAMA = "05";
+    /** 06 오접수·중복 접수 — 접수를 잘못 받았거나 중복으로 받은 건을 닫는다. 접수 서비스에 알려 접수가 취소 처리한다(admin 코드 추가 후 사용) */
+    public static final String DISPOSITION_VOID = "06";
     public static final List<String> DISPOSITION_TYPE_FALLBACK =
-            List.of(DISPOSITION_HOME, DISPOSITION_ADMIT, DISPOSITION_TRANSFER, DISPOSITION_DEATH, DISPOSITION_DAMA);
+            List.of(DISPOSITION_HOME, DISPOSITION_ADMIT, DISPOSITION_TRANSFER, DISPOSITION_DEATH, DISPOSITION_DAMA,
+                    DISPOSITION_VOID);
+    /** 오접수·중복 접수의 사유 유형: 중복 접수 / 접수 오류 (접수 서비스 취소 사유 DUPLICATE / MISTAKE 로 매핑된다) */
+    public static final String VOID_REASON_DUPLICATE = "DUPLICATE";
+    public static final String VOID_REASON_ERRONEOUS = "ERRONEOUS";
+    public static final int VOID_REASON_MAX_LENGTH = 500;
 
     // ---- 처방 우선순위(ORDER_PRIORITY_CD)·시점(ORDER_TIMING_CD) — admin 값이 없을 때만 폴백 ----
     public static final String ORDER_PRIORITY_STAT = "01";
