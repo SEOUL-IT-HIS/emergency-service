@@ -19,4 +19,10 @@ public class EmergencyPatientDto {
     private LocalDateTime lastAssessedAt;
     private String memo;
     private String chiefComplaintRaw;
+    /** 최신 퇴실 결정의 유형(없으면 null) — 목록의 입원 배지용 */
+    private String dispositionTypeCode;
+    /** 입원이면 가장 최근 입원요청의 상태(01 요청됨 · 02 병상 배정 · 03 거부). 요청을 아직 보내지 않았으면 null */
+    private String admissionStatusCode;
+    /** 병동이 배정한 병동(02 일 때) */
+    private String assignedWardCode;
 }

@@ -19,6 +19,22 @@ public class CommonCodeCache {
 
     private final Map<String, List<AdminCommonCodeItemDto>> cache = new ConcurrentHashMap<>();
 
+    /**
+     * 기동 시 적재(CommonCodeCacheLoader)가 끝났는지. 적재는 웹 서버가 요청을 받기 시작한 뒤에 돌기 때문에, 그 사이에 화면이
+     * 공통코드를 조회하면 비었거나 일부만 오는데 화면은 그 결과를 그대로 쓴다(우선순위가 STAT 하나만 보이고 진료과·병동 선택칸이
+     * 입력칸으로 바뀌는 증상). 적재가 끝나기 전에는 조회 API 가 "아직 준비 중"으로 답해 화면이 다시 시도하게 한다.
+     * admin 이 꺼져 있어 비어 있는 채로 끝나도 준비됨으로 본다(계속 막지 않는다).
+     */
+    private volatile boolean ready;
+
+    public boolean isReady() {
+        return ready;
+    }
+
+    public void markReady() {
+        this.ready = true;
+    }
+
     public void put(String groupCode, List<AdminCommonCodeItemDto> codes) {
         cache.put(groupCode, codes);
     }

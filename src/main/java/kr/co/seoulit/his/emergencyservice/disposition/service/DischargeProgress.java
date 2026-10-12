@@ -89,6 +89,49 @@ public class DischargeProgress {
         return result;
     }
 
+    /**
+     * 환자 목록의 배지용 요약 — 최신 퇴실 결정의 유형과, 입원이면 가장 최근 입원요청의 상태·병동이 배정한 병동.
+     * admissionStatusCode 가 null 이면 입원으로 결정했지만 아직 입원요청을 보내지 않은 것이다.
+     * 퇴실 결정이 없는 접수는 결과에 없다. 상태를 바꾸지 않고 읽기만 한다.
+     */
+    public record FollowUp(String dispositionTypeCode, String admissionStatusCode, String assignedWardCode) {
+    }
+
+    public Map<String, FollowUp> followUps(Collection<String> receptionIds) {
+        Map<String, FollowUp> result = new HashMap<>();
+        if (receptionIds == null || receptionIds.isEmpty()) {
+            return result;
+        }
+        Map<String, Disposition> latest = new HashMap<>();
+        for (Disposition d : InChunks.query(receptionIds, dispositionRepository::findByReceptionIdIn)) {
+            Disposition cur = latest.get(d.getReceptionId());
+            if (cur == null || isAfter(d.getDecidedAt(), cur.getDecidedAt())) {
+                latest.put(d.getReceptionId(), d);
+            }
+        }
+        List<String> admitDispositionIds = latest.values().stream()
+                .filter(d -> EmgCodes.DISPOSITION_ADMIT.equals(d.getDispositionTypeCode()))
+                .map(Disposition::getId)
+                .collect(Collectors.toList());
+        Map<String, AdmissionRequest> latestRequest = new HashMap<>();
+        if (!admitDispositionIds.isEmpty()) {
+            for (AdmissionRequest a : InChunks.query(admitDispositionIds, admissionRequestRepository::findByDispositionIdIn)) {
+                AdmissionRequest cur = latestRequest.get(a.getDisposition().getId());
+                if (cur == null || isAfter(a.getRequestedAt(), cur.getRequestedAt())) {
+                    latestRequest.put(a.getDisposition().getId(), a);
+                }
+            }
+        }
+        latest.forEach((receptionId, d) -> {
+            AdmissionRequest request = latestRequest.get(d.getId());
+            result.put(receptionId, new FollowUp(
+                    d.getDispositionTypeCode(),
+                    request == null ? null : request.getRequestStatusCode(),
+                    request == null ? null : request.getAssignedWardCode()));
+        });
+        return result;
+    }
+
     public Stage stage(String receptionId) {
         return stages(List.of(receptionId)).get(receptionId);
     }
