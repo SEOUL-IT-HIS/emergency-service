@@ -1,9 +1,5 @@
-FROM eclipse-temurin:17-jdk-alpine
-
-run mkdir /app
-workdir /app
-
-add ./build/libs/*.jar /app/app.jar
-
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY build/libs/*-SNAPSHOT.jar /app/app.jar
 EXPOSE 8089
-entrypoint ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -25,6 +25,9 @@ app:
       - http://117.16.154.233:18080
       - http://seoulit.pe.kr:18080
       - http://localhost:18080
+      - http://seoulit.pe.kr:18090
+      - http://117.16.154.233:18090
+
   auth:
     # true 면 /api/emergency/** 를 로그인(Redis 세션) 없이 부를 때 401. 서버끼리 부르는 API(접수의 중복 접수 확인·접수 정보 전송)는 제외한다.
     # admin 이 만든 세션을 읽을 수 있는 환경(같은 Redis)에서 로그인한 브라우저로 확인한 뒤 켠다. 꺼 둬도 세션이 있으면 처리자 ID 는 세션의 empId 로 기록한다.
@@ -98,7 +101,7 @@ spring:
   datasource:
     url: jdbc:oracle:thin:@//seoulit.pe.kr:1521/FREEPDB1
     username: emergency
-    password: "emergency"
+    password: ${EMERGENCY_DB_PASSWORD}
     driver-class-name: oracle.jdbc.OracleDriver
   jpa:
     hibernate:
